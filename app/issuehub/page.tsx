@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
   MessageSquare,
@@ -15,17 +15,18 @@ import {
   ThumbsUp,
   CheckCircle,
   Clock,
-} from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { PostQuestionDialog } from "@/components/issuehub/post-question-dialog"
-import { QuestionDetailDialog } from "@/components/issuehub/question-detail-dialog"
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { PostQuestionDialog } from "@/components/issuehub/post-question-dialog";
+import { QuestionDetailDialog } from "@/components/issuehub/question-detail-dialog";
 
 // Mock questions data
 const questions = [
   {
     id: "1",
     title: "How to access the college library database from home?",
-    content: "I need to access research papers for my project but can't figure out how to log in remotely.",
+    content:
+      "I need to access research papers for my project but can't figure out how to log in remotely.",
     author: "Rahul Kumar",
     authorAvatar: "RK",
     category: "Library",
@@ -39,7 +40,8 @@ const questions = [
   {
     id: "2",
     title: "Missing grade for Data Structures midterm exam",
-    content: "My midterm exam grade is not showing up in the portal. Who should I contact about this?",
+    content:
+      "My midterm exam grade is not showing up in the portal. Who should I contact about this?",
     author: "Priya Sharma",
     authorAvatar: "PS",
     category: "Academics",
@@ -53,7 +55,8 @@ const questions = [
   {
     id: "3",
     title: "WiFi not working in Block C hostel",
-    content: "The WiFi has been down for 2 days in Block C. Has anyone else experienced this?",
+    content:
+      "The WiFi has been down for 2 days in Block C. Has anyone else experienced this?",
     author: "Arjun Patel",
     authorAvatar: "AP",
     category: "Infrastructure",
@@ -67,7 +70,8 @@ const questions = [
   {
     id: "4",
     title: "Best coding clubs to join for beginners?",
-    content: "I'm a first year student interested in competitive programming. Which clubs should I consider?",
+    content:
+      "I'm a first year student interested in competitive programming. Which clubs should I consider?",
     author: "Sneha Reddy",
     authorAvatar: "SR",
     category: "Clubs",
@@ -81,7 +85,8 @@ const questions = [
   {
     id: "5",
     title: "Bus schedule changed - where to find updates?",
-    content: "The college bus timings seem to have changed but I can't find the new schedule anywhere.",
+    content:
+      "The college bus timings seem to have changed but I can't find the new schedule anywhere.",
     author: "Vikram Singh",
     authorAvatar: "VS",
     category: "Transport",
@@ -95,7 +100,8 @@ const questions = [
   {
     id: "6",
     title: "How to apply for scholarship programs?",
-    content: "Are there any merit-based scholarships available? What's the application process?",
+    content:
+      "Are there any merit-based scholarships available? What's the application process?",
     author: "Anjali Gupta",
     authorAvatar: "AG",
     category: "Financial",
@@ -106,47 +112,68 @@ const questions = [
     timeAgo: "1 day ago",
     trending: false,
   },
-]
+];
 
-const categories = ["All", "Academics", "Infrastructure", "Library", "Clubs", "Transport", "Financial"]
+const categories = [
+  "All",
+  "Academics",
+  "Infrastructure",
+  "Library",
+  "Clubs",
+  "Transport",
+  "Financial",
+];
 
 export default function IssueHubPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("All")
-  const [showPostDialog, setShowPostDialog] = useState(false)
-  const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [showPostDialog, setShowPostDialog] = useState(false);
+  const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
 
   const filteredQuestions = questions.filter((q) => {
     const matchesSearch =
       q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       q.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      q.tags.some((tag) =>
+        tag.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
-    const matchesCategory = selectedCategory === "All" || q.category === selectedCategory
+    const matchesCategory =
+      selectedCategory === "All" || q.category === selectedCategory;
 
-    return matchesSearch && matchesCategory
-  })
+    return matchesSearch && matchesCategory;
+  });
 
-  const trendingQuestions = questions.filter((q) => q.trending).slice(0, 3)
-  const selectedQuestionData = questions.find((q) => q.id === selectedQuestion)
+  const trendingQuestions = questions.filter((q) => q.trending).slice(0, 3);
+  const selectedQuestionData = questions.find((q) => q.id === selectedQuestion);
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-background transition-colors duration-300">
       {/* Navigation */}
-      <nav className="border-b border-secondary backdrop-blur-sm bg-black/50">
+      <nav className="border-b border-border backdrop-blur-sm bg-background/80 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-secondary" asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-secondary"
+              asChild
+            >
               <Link href="/">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </Button>
             <div>
-              <h1 className="text-xl font-medium text-white">IssueHub</h1>
-              <p className="text-xs text-muted-foreground">Campus Community Platform</p>
+              <h1 className="text-xl font-medium text-foreground">IssueHub</h1>
+              <p className="text-xs text-muted-foreground">
+                Campus Community Platform
+              </p>
             </div>
           </div>
-          <Button className="bg-primary hover:bg-primary/90 text-white" onClick={() => setShowPostDialog(true)}>
+          <Button
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            onClick={() => setShowPostDialog(true)}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Ask Question
           </Button>
@@ -161,9 +188,13 @@ export default function IssueHubPage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
-                <h2 className="text-3xl font-medium text-white">Community Questions</h2>
+                <h2 className="text-3xl font-medium text-foreground">
+                  Community Questions
+                </h2>
               </div>
-              <p className="text-muted-foreground mb-6">Get help from your peers and share your knowledge</p>
+              <p className="text-muted-foreground mb-6">
+                Get help from your peers and share your knowledge
+              </p>
 
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -171,7 +202,7 @@ export default function IssueHubPage() {
                   placeholder="Search questions, tags, or topics..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-card border-secondary text-white placeholder:text-muted-foreground"
+                  className="pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground"
                 />
               </div>
             </div>
@@ -186,7 +217,7 @@ export default function IssueHubPage() {
                   onClick={() => setSelectedCategory(category)}
                   className={`${
                     selectedCategory === category
-                      ? "bg-primary border-primary text-white"
+                      ? "bg-primary border-primary text-primary-foreground"
                       : "border-secondary hover:bg-secondary bg-transparent text-muted-foreground"
                   }`}
                 >
@@ -214,13 +245,15 @@ export default function IssueHubPage() {
                       >
                         <ThumbsUp className="w-4 h-4" />
                       </Button>
-                      <span className="text-sm font-medium text-white">{question.upvotes}</span>
+                      <span className="text-sm font-medium text-foreground">
+                        {question.upvotes}
+                      </span>
                     </div>
 
                     {/* Question Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4 mb-2">
-                        <h3 className="text-lg font-medium text-white hover:text-primary transition-colors duration-200">
+                        <h3 className="text-lg font-medium text-foreground hover:text-primary transition-colors duration-200">
                           {question.title}
                         </h3>
                         {question.trending && (
@@ -231,19 +264,28 @@ export default function IssueHubPage() {
                         )}
                       </div>
 
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{question.content}</p>
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                        {question.content}
+                      </p>
 
                       <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                            <span className="text-xs font-medium text-primary">{question.authorAvatar}</span>
+                            <span className="text-xs font-medium text-primary">
+                              {question.authorAvatar}
+                            </span>
                           </div>
-                          <span className="text-xs text-muted-foreground">{question.author}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {question.author}
+                          </span>
                         </div>
 
                         <span className="text-xs text-muted-foreground">•</span>
 
-                        <Badge variant="outline" className="border-secondary text-foreground text-xs">
+                        <Badge
+                          variant="outline"
+                          className="border-secondary text-foreground text-xs"
+                        >
                           {question.category}
                         </Badge>
 
@@ -254,12 +296,16 @@ export default function IssueHubPage() {
                           <span>{question.timeAgo}</span>
                         </div>
 
-                        <span className="text-xs text-muted-foreground ml-auto">•</span>
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          •
+                        </span>
 
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-1">
                             <MessageCircle className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">{question.answers} answers</span>
+                            <span className="text-xs text-muted-foreground">
+                              {question.answers} answers
+                            </span>
                           </div>
 
                           {question.status === "answered" && (
@@ -273,7 +319,10 @@ export default function IssueHubPage() {
 
                       <div className="flex flex-wrap gap-1.5 mt-3">
                         {question.tags.map((tag, index) => (
-                          <span key={index} className="text-xs px-2 py-1 rounded-md bg-secondary text-foreground">
+                          <span
+                            key={index}
+                            className="text-xs px-2 py-1 rounded-md bg-secondary text-foreground"
+                          >
                             #{tag}
                           </span>
                         ))}
@@ -289,18 +338,30 @@ export default function IssueHubPage() {
           <div className="space-y-6">
             {/* Stats Card */}
             <Card className="p-6 bg-card border-secondary">
-              <h3 className="text-lg font-medium text-white mb-4">Community Stats</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Community Stats
+              </h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Questions</span>
-                  <span className="text-lg font-medium text-white">1,247</span>
+                  <span className="text-sm text-muted-foreground">
+                    Total Questions
+                  </span>
+                  <span className="text-lg font-medium text-foreground">
+                    1,247
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Answered</span>
-                  <span className="text-lg font-medium text-green-500">892</span>
+                  <span className="text-sm text-muted-foreground">
+                    Answered
+                  </span>
+                  <span className="text-lg font-medium text-green-500">
+                    892
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Active Users</span>
+                  <span className="text-sm text-muted-foreground">
+                    Active Users
+                  </span>
                   <span className="text-lg font-medium text-primary">342</span>
                 </div>
               </div>
@@ -310,7 +371,9 @@ export default function IssueHubPage() {
             <Card className="p-6 bg-card border-secondary">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-medium text-white">Trending Now</h3>
+                <h3 className="text-lg font-medium text-foreground">
+                  Trending Now
+                </h3>
               </div>
               <div className="space-y-3">
                 {trendingQuestions.map((question) => (
@@ -319,7 +382,9 @@ export default function IssueHubPage() {
                     className="p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors duration-200 cursor-pointer"
                     onClick={() => setSelectedQuestion(question.id)}
                   >
-                    <p className="text-sm text-white mb-2 line-clamp-2">{question.title}</p>
+                    <p className="text-sm text-foreground mb-2 line-clamp-2">
+                      {question.title}
+                    </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <ThumbsUp className="w-3 h-3" />
                       <span>{question.upvotes}</span>
@@ -334,7 +399,9 @@ export default function IssueHubPage() {
 
             {/* Guidelines */}
             <Card className="p-6 bg-card border-secondary">
-              <h3 className="text-lg font-medium text-white mb-4">Community Guidelines</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Community Guidelines
+              </h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <span className="text-primary">•</span>
@@ -363,7 +430,7 @@ export default function IssueHubPage() {
         open={showPostDialog}
         onOpenChange={setShowPostDialog}
         onPost={() => {
-          setShowPostDialog(false)
+          setShowPostDialog(false);
           // In production, add new question here
         }}
       />
@@ -377,5 +444,5 @@ export default function IssueHubPage() {
         />
       )}
     </div>
-  )
+  );
 }

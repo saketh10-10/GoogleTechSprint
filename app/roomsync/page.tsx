@@ -1,13 +1,22 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { ArrowLeft, Building2, Search, Sparkles, Users, Clock, CheckCircle2, AlertCircle } from "lucide-react"
-import { RoomAllocationDialog } from "@/components/roomsync/room-allocation-dialog"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  ArrowLeft,
+  Building2,
+  Search,
+  Sparkles,
+  Users,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
+import { RoomAllocationDialog } from "@/components/roomsync/room-allocation-dialog";
+import { Badge } from "@/components/ui/badge";
 
 // Mock rooms data
 const rooms = [
@@ -73,7 +82,7 @@ const rooms = [
     facilities: ["Projector", "AC", "Audio System"],
     currentAllocation: null,
   },
-]
+];
 
 const aiSuggestions = [
   {
@@ -94,40 +103,47 @@ const aiSuggestions = [
     reason: "Large capacity suitable for combined classes",
     confidence: 82,
   },
-]
+];
 
 export default function RoomSyncPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedRoom, setSelectedRoom] = useState<string | null>(null)
-  const [showDialog, setShowDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
+  const [showDialog, setShowDialog] = useState(false);
 
   const filteredRooms = rooms.filter(
     (room) =>
       room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      room.building.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      room.building.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleAllocateRoom = (roomId: string) => {
-    setSelectedRoom(roomId)
-    setShowDialog(true)
-  }
+    setSelectedRoom(roomId);
+    setShowDialog(true);
+  };
 
-  const selectedRoomData = rooms.find((r) => r.id === selectedRoom)
+  const selectedRoomData = rooms.find((r) => r.id === selectedRoom);
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-background transition-colors duration-300">
       {/* Navigation */}
-      <nav className="border-b border-secondary backdrop-blur-sm bg-black/50">
+      <nav className="border-b border-border backdrop-blur-sm bg-background/80 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-secondary" asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-secondary"
+              asChild
+            >
               <Link href="/">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </Button>
             <div>
-              <h1 className="text-xl font-medium text-white">RoomSync</h1>
-              <p className="text-xs text-muted-foreground">Intelligent Room Allocation System</p>
+              <h1 className="text-xl font-medium text-foreground">RoomSync</h1>
+              <p className="text-xs text-muted-foreground">
+                Intelligent Room Allocation System
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -143,9 +159,13 @@ export default function RoomSyncPage() {
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
             <Building2 className="w-5 h-5 text-accent" />
-            <h2 className="text-3xl font-medium text-white">Room Management</h2>
+            <h2 className="text-3xl font-medium text-foreground">
+              Room Management
+            </h2>
           </div>
-          <p className="text-muted-foreground mb-6">View all rooms and allocate them to sections with AI assistance</p>
+          <p className="text-muted-foreground mb-6">
+            View all rooms and allocate them to sections with AI assistance
+          </p>
 
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -153,7 +173,7 @@ export default function RoomSyncPage() {
               placeholder="Search rooms or buildings..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-card border-secondary text-white placeholder:text-muted-foreground"
+              className="pl-10 bg-card border-secondary text-foreground placeholder:text-muted-foreground"
             />
           </div>
         </div>
@@ -162,8 +182,12 @@ export default function RoomSyncPage() {
         <Card className="p-6 bg-card border-accent/30 mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-5 h-5 text-accent" />
-            <h3 className="text-lg font-medium text-white">AI Suggestions</h3>
-            <Badge className="ml-auto bg-accent/10 text-accent border-accent/20">Powered by AI</Badge>
+            <h3 className="text-lg font-medium text-foreground">
+              AI Suggestions
+            </h3>
+            <Badge className="ml-auto bg-accent/10 text-accent border-accent/20">
+              Powered by AI
+            </Badge>
           </div>
 
           <div className="space-y-3">
@@ -174,15 +198,25 @@ export default function RoomSyncPage() {
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-white">{suggestion.room}</span>
+                    <span className="text-sm font-medium text-foreground">
+                      {suggestion.room}
+                    </span>
                     <span className="text-xs text-muted-foreground">→</span>
-                    <span className="text-sm text-accent">{suggestion.section}</span>
+                    <span className="text-sm text-accent">
+                      {suggestion.section}
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{suggestion.reason}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {suggestion.reason}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-muted-foreground mb-1">Confidence</p>
-                  <p className="text-sm font-medium text-accent">{suggestion.confidence}%</p>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Confidence
+                  </p>
+                  <p className="text-sm font-medium text-accent">
+                    {suggestion.confidence}%
+                  </p>
                 </div>
               </div>
             ))}
@@ -197,7 +231,9 @@ export default function RoomSyncPage() {
                 <Building2 className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-medium text-white">{rooms.length}</p>
+                <p className="text-2xl font-medium text-foreground">
+                  {rooms.length}
+                </p>
                 <p className="text-xs text-muted-foreground">Total Rooms</p>
               </div>
             </div>
@@ -209,7 +245,7 @@ export default function RoomSyncPage() {
                 <CheckCircle2 className="w-5 h-5 text-green-500" />
               </div>
               <div>
-                <p className="text-2xl font-medium text-white">
+                <p className="text-2xl font-medium text-foreground">
                   {rooms.filter((r) => r.status === "available").length}
                 </p>
                 <p className="text-xs text-muted-foreground">Available</p>
@@ -223,7 +259,9 @@ export default function RoomSyncPage() {
                 <AlertCircle className="w-5 h-5 text-orange-500" />
               </div>
               <div>
-                <p className="text-2xl font-medium text-white">{rooms.filter((r) => r.status === "occupied").length}</p>
+                <p className="text-2xl font-medium text-foreground">
+                  {rooms.filter((r) => r.status === "occupied").length}
+                </p>
                 <p className="text-xs text-muted-foreground">Occupied</p>
               </div>
             </div>
@@ -243,8 +281,12 @@ export default function RoomSyncPage() {
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-medium text-white mb-1">{room.name}</h3>
-                  <p className="text-sm text-muted-foreground">{room.building}</p>
+                  <h3 className="text-lg font-medium text-foreground mb-1">
+                    {room.name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {room.building}
+                  </p>
                 </div>
                 <Badge
                   variant="outline"
@@ -262,12 +304,17 @@ export default function RoomSyncPage() {
                 <div className="flex items-center gap-2 text-sm">
                   <Users className="w-4 h-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Capacity:</span>
-                  <span className="text-white font-medium">{room.capacity} students</span>
+                  <span className="text-foreground font-medium">
+                    {room.capacity} students
+                  </span>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
                   {room.facilities.map((facility, index) => (
-                    <span key={index} className="text-xs px-2 py-1 rounded-md bg-secondary text-foreground">
+                    <span
+                      key={index}
+                      className="text-xs px-2 py-1 rounded-md bg-secondary text-foreground"
+                    >
                       {facility}
                     </span>
                   ))}
@@ -277,10 +324,16 @@ export default function RoomSyncPage() {
                   <div className="mt-3 p-3 rounded-lg bg-secondary/50">
                     <div className="flex items-center gap-2 mb-2">
                       <Clock className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{room.currentAllocation.time}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {room.currentAllocation.time}
+                      </span>
                     </div>
-                    <p className="text-sm text-white font-medium">{room.currentAllocation.section}</p>
-                    <p className="text-xs text-muted-foreground">{room.currentAllocation.subject}</p>
+                    <p className="text-sm text-foreground font-medium">
+                      {room.currentAllocation.section}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {room.currentAllocation.subject}
+                    </p>
                   </div>
                 )}
               </div>
@@ -288,7 +341,7 @@ export default function RoomSyncPage() {
               <Button
                 className={`w-full ${
                   room.status === "available"
-                    ? "bg-primary hover:bg-primary/90 text-white"
+                    ? "bg-primary hover:bg-primary/90 text-primary-foreground"
                     : "bg-secondary hover:bg-secondary/90 text-muted-foreground"
                 }`}
                 onClick={() => handleAllocateRoom(room.id)}
@@ -308,11 +361,11 @@ export default function RoomSyncPage() {
           open={showDialog}
           onOpenChange={setShowDialog}
           onAllocate={() => {
-            setShowDialog(false)
+            setShowDialog(false);
             // In production, update room allocation here
           }}
         />
       )}
     </div>
-  )
+  );
 }

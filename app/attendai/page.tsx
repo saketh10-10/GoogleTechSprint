@@ -1,11 +1,19 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Mail, AlertCircle } from "lucide-react"
-import { QRCodeDisplay } from "@/components/attendai/qr-code-display"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  MapPin,
+  Users,
+  Mail,
+  AlertCircle,
+} from "lucide-react";
+import { QRCodeDisplay } from "@/components/attendai/qr-code-display";
 
 // Mock events data
 const todayEvents = [
@@ -45,42 +53,51 @@ const todayEvents = [
     attendees: 60,
     status: "upcoming" as const,
   },
-]
+];
 
 export default function AttendAIPage() {
-  const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
-  const [showQR, setShowQR] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
+  const [showQR, setShowQR] = useState(false);
 
   const handleEventSelect = (eventId: string) => {
-    setSelectedEvent(eventId)
-    setShowQR(true)
-  }
+    setSelectedEvent(eventId);
+    setShowQR(true);
+  };
 
   const handleBack = () => {
-    setShowQR(false)
-    setSelectedEvent(null)
-  }
+    setShowQR(false);
+    setSelectedEvent(null);
+  };
 
-  const selectedEventData = todayEvents.find((e) => e.id === selectedEvent)
+  const selectedEventData = todayEvents.find((e) => e.id === selectedEvent);
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-background transition-colors duration-300">
       {/* Navigation */}
-      <nav className="border-b border-secondary backdrop-blur-sm bg-black/50">
+      <nav className="border-b border-border backdrop-blur-sm bg-background/80 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-secondary" asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-secondary"
+              asChild
+            >
               <Link href="/">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </Button>
             <div>
-              <h1 className="text-xl font-medium text-white">AttendAI</h1>
-              <p className="text-xs text-muted-foreground">AI-Powered Attendance System</p>
+              <h1 className="text-xl font-medium text-foreground">AttendAI</h1>
+              <p className="text-xs text-muted-foreground">
+                AI-Powered Attendance System
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:inline">Student Portal</span>
+            <span className="text-sm text-muted-foreground hidden sm:inline">
+              Student Portal
+            </span>
           </div>
         </div>
       </nav>
@@ -92,9 +109,13 @@ export default function AttendAIPage() {
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-2">
                 <Calendar className="w-5 h-5 text-primary" />
-                <h2 className="text-3xl font-medium text-white">Today's Events</h2>
+                <h2 className="text-3xl font-medium text-foreground">
+                  Today's Events
+                </h2>
               </div>
-              <p className="text-muted-foreground">Select an event to generate your unique attendance QR code</p>
+              <p className="text-muted-foreground">
+                Select an event to generate your unique attendance QR code
+              </p>
             </div>
 
             {/* Events Grid */}
@@ -107,12 +128,16 @@ export default function AttendAIPage() {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="text-xl font-medium text-white mb-1 group-hover:text-primary transition-colors duration-200">
+                      <h3 className="text-xl font-medium text-foreground mb-1 group-hover:text-primary transition-colors duration-200">
                         {event.title}
                       </h3>
-                      <p className="text-sm text-muted-foreground">{event.instructor}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {event.instructor}
+                      </p>
                     </div>
-                    <span className="px-2 py-1 text-xs rounded-md bg-primary/10 text-primary">{event.status}</span>
+                    <span className="px-2 py-1 text-xs rounded-md bg-primary/10 text-primary">
+                      {event.status}
+                    </span>
                   </div>
 
                   <div className="space-y-2 mb-4">
@@ -130,7 +155,9 @@ export default function AttendAIPage() {
                     </div>
                   </div>
 
-                  <Button className="w-full bg-primary hover:bg-primary/90 text-white">Generate QR Code</Button>
+                  <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                    Generate QR Code
+                  </Button>
                 </Card>
               ))}
             </div>
@@ -140,23 +167,37 @@ export default function AttendAIPage() {
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-primary mt-0.5" />
                 <div>
-                  <h3 className="text-lg font-medium text-white mb-2">How It Works</h3>
+                  <h3 className="text-lg font-medium text-foreground mb-2">
+                    How It Works
+                  </h3>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span>Select an event to generate your unique, non-shareable QR code</span>
+                      <span>
+                        Select an event to generate your unique, non-shareable
+                        QR code
+                      </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span>Screenshots are disabled to prevent misuse and ensure attendance integrity</span>
+                      <span>
+                        Screenshots are disabled to prevent misuse and ensure
+                        attendance integrity
+                      </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span>Once scanned, an automatic email confirmation is sent to the designated authority</span>
+                      <span>
+                        Once scanned, an automatic email confirmation is sent to
+                        the designated authority
+                      </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span>Each QR code is time-limited and expires after the event ends</span>
+                      <span>
+                        Each QR code is time-limited and expires after the event
+                        ends
+                      </span>
                     </li>
                   </ul>
                 </div>
@@ -171,7 +212,7 @@ export default function AttendAIPage() {
                 <Button
                   variant="ghost"
                   onClick={handleBack}
-                  className="mb-6 text-muted-foreground hover:text-white hover:bg-secondary"
+                  className="mb-6 text-muted-foreground hover:text-foreground hover:bg-secondary"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Events
@@ -179,8 +220,12 @@ export default function AttendAIPage() {
 
                 <Card className="p-8 bg-card border-secondary">
                   <div className="text-center mb-6">
-                    <h2 className="text-2xl font-medium text-white mb-2">{selectedEventData.title}</h2>
-                    <p className="text-muted-foreground">{selectedEventData.instructor}</p>
+                    <h2 className="text-2xl font-medium text-foreground mb-2">
+                      {selectedEventData.title}
+                    </h2>
+                    <p className="text-muted-foreground">
+                      {selectedEventData.instructor}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-8 p-4 rounded-xl bg-secondary/50">
@@ -189,28 +234,38 @@ export default function AttendAIPage() {
                         <Clock className="w-4 h-4" />
                         <span>Time</span>
                       </div>
-                      <p className="text-sm text-white">{selectedEventData.time}</p>
+                      <p className="text-sm text-foreground">
+                        {selectedEventData.time}
+                      </p>
                     </div>
                     <div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                         <MapPin className="w-4 h-4" />
                         <span>Location</span>
                       </div>
-                      <p className="text-sm text-white">{selectedEventData.location}</p>
+                      <p className="text-sm text-foreground">
+                        {selectedEventData.location}
+                      </p>
                     </div>
                   </div>
 
                   {/* QR Code Component */}
-                  <QRCodeDisplay eventId={selectedEventData.id} eventTitle={selectedEventData.title} />
+                  <QRCodeDisplay
+                    eventId={selectedEventData.id}
+                    eventTitle={selectedEventData.title}
+                  />
 
                   <div className="mt-8 p-4 rounded-xl bg-primary/5 border border-primary/20">
                     <div className="flex items-start gap-3">
                       <Mail className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                       <div>
-                        <h3 className="text-sm font-medium text-white mb-1">Email Notification</h3>
+                        <h3 className="text-sm font-medium text-white mb-1">
+                          Email Notification
+                        </h3>
                         <p className="text-xs text-muted-foreground">
-                          Once your QR code is scanned, an automated email will be sent to the course instructor
-                          confirming your attendance.
+                          Once your QR code is scanned, an automated email will
+                          be sent to the course instructor confirming your
+                          attendance.
                         </p>
                       </div>
                     </div>
@@ -220,10 +275,13 @@ export default function AttendAIPage() {
                     <div className="flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
                       <div>
-                        <h3 className="text-sm font-medium text-white mb-1">Security Notice</h3>
+                        <h3 className="text-sm font-medium text-white mb-1">
+                          Security Notice
+                        </h3>
                         <p className="text-xs text-muted-foreground">
-                          This QR code is unique to you and cannot be shared. Screenshots are disabled on this page. The
-                          code expires at the end of the event.
+                          This QR code is unique to you and cannot be shared.
+                          Screenshots are disabled on this page. The code
+                          expires at the end of the event.
                         </p>
                       </div>
                     </div>
@@ -235,5 +293,5 @@ export default function AttendAIPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
