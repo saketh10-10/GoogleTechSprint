@@ -10,6 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { DemoSection } from "@/components/demo-section";
 
 export default function HomePage() {
   return (
@@ -213,6 +214,11 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
+      </section>
+
+      {/* Demo Section */}
+      <section id="demo" className="relative">
+        <DemoSection />
       </section>
 
       {/* Benefits Section */}
