@@ -66,8 +66,15 @@ export function QuestionDetailDialog({ question, open, onOpenChange }: QuestionD
   };
 
   const handleUpvote = async (answerId: string, currentUpvoted: boolean) => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      alert("You must be logged in to upvote.");
+      return;
+    }
+
     try {
-      const newUpvotedState = await toggleUpvote(answerId, 'answer');
+      const newUpvotedState = await toggleUpvote(user.uid, answerId, 'answer');
 
       // Update local state optimistically
       setAnswers(prevAnswers =>

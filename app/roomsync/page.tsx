@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,6 +18,9 @@ import {
 } from "lucide-react";
 import { RoomAllocationDialog } from "@/components/roomsync/room-allocation-dialog";
 import { Badge } from "@/components/ui/badge";
+import { getCurrentUser } from "@/lib/auth-service";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 // Mock rooms data
 const rooms = [
@@ -106,9 +110,13 @@ const aiSuggestions = [
 ];
 
 export default function RoomSyncPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
 
   const filteredRooms = rooms.filter(
     (room) =>
@@ -122,6 +130,72 @@ export default function RoomSyncPage() {
   };
 
   const selectedRoomData = rooms.find((r) => r.id === selectedRoom);
+
+  // Authentication check
+  useEffect(() => {
+    const checkAuth = async () => {
+      const user = getCurrentUser();
+
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      // Check user role
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.role === 'student' || userData.role === 'faculty') {
+            setIsAuthorized(true);
+          } else {
+            router.push('/unauthorized');
+          }
+        } else {
+          // User document doesn't exist - redirect to login
+          console.warn('User document not found, redirecting to login');
+          router.push('/login');
+        }
+      } catch (error: any) {
+        console.error('Error checking user role:', error);
+
+        // Handle different types of errors
+        if (error.code === 'unavailable' || error.message?.includes('offline')) {
+          // Network connectivity issue - allow access but show warning
+          console.warn('Network connectivity issue, allowing access with limited functionality');
+          setIsOffline(true);
+          setIsAuthorized(true); // Allow access but with limited functionality
+        } else if (error.code === 'permission-denied') {
+          // Firestore security rules blocking access
+          console.error('Permission denied accessing user document');
+          router.push('/login');
+        } else {
+          // Other errors - redirect to login
+          console.error('Unknown error accessing user document:', error.code);
+          router.push('/login');
+        }
+      }
+
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, [router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
@@ -155,6 +229,13 @@ export default function RoomSyncPage() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 py-12">
+        {isOffline && (
+          <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-sm text-yellow-600 dark:text-yellow-400">
+              ⚠️ You appear to be offline. Some features may have limited functionality.
+            </p>
+          </div>
+        )}
         {/* Header & Search */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
@@ -365,7 +446,7 @@ export default function RoomSyncPage() {
             // In production, update room allocation here
           }}
         />
-      )}
-    </div>
+        )}
+      </div>
   );
 }

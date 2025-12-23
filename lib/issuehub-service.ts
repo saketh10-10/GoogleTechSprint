@@ -67,7 +67,21 @@ export const createUserProfile = async (user: User): Promise<void> => {
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   const userDoc = await getDoc(doc(usersRef, userId));
   if (!userDoc.exists()) return null;
-  return { id: userDoc.id, ...userDoc.data() } as UserProfile;
+  const data = userDoc.data();
+  return {
+    id: userDoc.id,
+    userId: data?.userId || userId,
+    name: data?.name || '',
+    followersCount: data?.followersCount || 0,
+    followingCount: data?.followingCount || 0,
+    postsCount: data?.postsCount || 0,
+    answersCount: data?.answersCount || 0,
+    totalUpvotesReceived: data?.totalUpvotesReceived || 0,
+    reputation: data?.reputation || 0,
+    badges: data?.badges || [],
+    joinedAt: data?.joinedAt?.toDate() || new Date(),
+    lastActive: data?.lastActive?.toDate() || new Date()
+  } as UserProfile;
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>): Promise<void> => {
@@ -500,7 +514,20 @@ export const subscribeToAnswers = (postId: string, callback: (answers: AnswerWit
 export const subscribeToUserProfile = (userId: string, callback: (profile: UserProfile) => void) => {
   return onSnapshot(doc(usersRef, userId), (doc) => {
     if (doc.exists()) {
-      const profile = { id: doc.id, ...doc.data() } as UserProfile;
+      const data = doc.data();
+      const profile: UserProfile = {
+        userId: data?.userId || userId,
+        name: data?.name || '',
+        followersCount: data?.followersCount || 0,
+        followingCount: data?.followingCount || 0,
+        postsCount: data?.postsCount || 0,
+        answersCount: data?.answersCount || 0,
+        totalUpvotesReceived: data?.totalUpvotesReceived || 0,
+        reputation: data?.reputation || 0,
+        badges: data?.badges || [],
+        joinedAt: data?.joinedAt?.toDate() || new Date(),
+        lastActive: data?.lastActive?.toDate() || new Date()
+      };
       callback(profile);
     }
   });

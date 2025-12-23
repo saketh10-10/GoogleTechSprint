@@ -4,16 +4,8 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
-        "source": "/dashboard",
-        "destination": "/attendance/dashboard.html"
-      },
-      {
-        "source": "/event",
-        "destination": "/attendance/event.html"
-      },
-      {
-        "source": "/qr",
-        "destination": "/attendance/qr.html"
+        "source": "**",
+        "destination": "/index.html"
       }
     ]
   },

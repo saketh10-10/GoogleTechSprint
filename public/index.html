@@ -14,7 +14,7 @@
     </style>
 </head>
 <body>
-    <h1>Firebase Universal Authentication Test</h1>
+    <h1>Firebase Authentication Test</h1>
 
     <div class="test-section">
         <h2>Firebase Connection Test</h2>
@@ -58,21 +58,6 @@
         <div id="faculty-signup-result"></div>
     </div>
 
-    <div class="test-section">
-        <h2>🚀 Universal Authentication Test</h2>
-        <p><em>Single form that handles login with automatic signup fallback</em></p>
-        <input type="text" id="universal-identifier" placeholder="Roll Number or Email (e.g., 2410030001 or faculty@klh.edu.in)" value="2410030001">
-        <input type="password" id="universal-password" placeholder="Password" value="Student@123">
-        <button onclick="testUniversalAuth()">Authenticate</button>
-        <div id="universal-result"></div>
-        <p class="note">
-            <strong>How it works:</strong><br>
-            1. Tries to login first<br>
-            2. If user doesn't exist, automatically creates account<br>
-            3. Determines role from email domain (@klh.student = student, @klh.edu.in = faculty)
-        </p>
-    </div>
-
     <script type="module">
         // Firebase Configuration (same as main app)
         const firebaseConfig = {
@@ -92,7 +77,8 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
 
-        // Individual authentication functions
+        // Import authentication service functions (simulated for this test page)
+        // In a real app, you'd import from './lib/auth-service.js'
         const signInStudent = async (rollNumber, password) => {
             try {
                 const email = `${rollNumber.trim()}@klh.student`;
@@ -109,29 +95,6 @@
                 };
             } catch (error) {
                 console.error('❌ STUDENT LOGIN ERROR:', error?.code, error?.message);
-                return {
-                    success: false,
-                    error: error?.code || 'unknown-error',
-                    message: getAuthErrorMessage(error?.code)
-                };
-            }
-        };
-
-        const signInFaculty = async (email, password) => {
-            try {
-                console.log('🔐 FACULTY LOGIN: Attempting authentication for', email.trim());
-
-                const { signInWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
-                const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-
-                console.log('✅ FACULTY LOGIN SUCCESS: User authenticated', userCredential.user.uid);
-                return {
-                    success: true,
-                    user: userCredential.user,
-                    message: 'Faculty login successful!'
-                };
-            } catch (error) {
-                console.error('❌ FACULTY LOGIN ERROR:', error?.code, error?.message);
                 return {
                     success: false,
                     error: error?.code || 'unknown-error',
@@ -164,6 +127,29 @@
             }
         };
 
+        const signInFaculty = async (email, password) => {
+            try {
+                console.log('🔐 FACULTY LOGIN: Attempting authentication for', email.trim());
+
+                const { signInWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
+                const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+
+                console.log('✅ FACULTY LOGIN SUCCESS: User authenticated', userCredential.user.uid);
+                return {
+                    success: true,
+                    user: userCredential.user,
+                    message: 'Faculty login successful!'
+                };
+            } catch (error) {
+                console.error('❌ FACULTY LOGIN ERROR:', error?.code, error?.message);
+                return {
+                    success: false,
+                    error: error?.code || 'unknown-error',
+                    message: getAuthErrorMessage(error?.code)
+                };
+            }
+        };
+
         const registerFaculty = async (email, password) => {
             try {
                 console.log('📝 FACULTY SIGNUP: Creating new account for', email.trim());
@@ -179,91 +165,6 @@
                 };
             } catch (error) {
                 console.error('❌ FACULTY SIGNUP ERROR:', error?.code, error?.message);
-                return {
-                    success: false,
-                    error: error?.code || 'unknown-error',
-                    message: getAuthErrorMessage(error?.code)
-                };
-            }
-        };
-
-        // Universal authentication with automatic signup fallback
-        const authenticateUser = async (identifier, password) => {
-            try {
-                const trimmedIdentifier = identifier.trim();
-
-                // Determine user type and construct email based on identifier format
-                let email;
-                let userType;
-
-                if (trimmedIdentifier.includes('@')) {
-                    // It's an email address
-                    email = trimmedIdentifier;
-                    if (email.endsWith('@klh.edu.in')) {
-                        userType = 'faculty';
-                    } else {
-                        return {
-                            success: false,
-                            error: 'auth/invalid-email',
-                            message: 'Please use a valid KLH email address.'
-                        };
-                    }
-                } else {
-                    // It's a roll number - convert to student email
-                    email = `${trimmedIdentifier}@klh.student`;
-                    userType = 'student';
-                }
-
-                console.log(`🔐 ${userType.toUpperCase()} AUTH: Attempting authentication for`, email);
-
-                // FIRST: Try to login
-                try {
-                    const { signInWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
-                    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                    console.log(`✅ ${userType.toUpperCase()} LOGIN SUCCESS: User authenticated`, userCredential.user.uid);
-
-                    return {
-                        success: true,
-                        user: userCredential.user,
-                        message: `${userType === 'student' ? 'Student' : 'Faculty'} login successful!`
-                    };
-                } catch (loginError) {
-                    // If login fails with user-not-found or invalid-credential, try signup
-                    if (loginError.code === 'auth/user-not-found' || loginError.code === 'auth/invalid-credential') {
-                        console.log(`📝 ${userType.toUpperCase()} NOT FOUND: Attempting automatic signup for`, email);
-
-                        // SECOND: Try to create account
-                        try {
-                            const { createUserWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
-                            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-                            console.log(`✅ ${userType.toUpperCase()} SIGNUP SUCCESS: New account created`, userCredential.user.uid);
-
-                            return {
-                                success: true,
-                                user: userCredential.user,
-                                message: `${userType === 'student' ? 'Student' : 'Faculty'} account created and login successful!`
-                            };
-                        } catch (signupError) {
-                            console.error(`❌ ${userType.toUpperCase()} SIGNUP ERROR:`, signupError?.code, signupError?.message);
-                            return {
-                                success: false,
-                                error: signupError?.code || 'unknown-error',
-                                message: getAuthErrorMessage(signupError?.code)
-                            };
-                        }
-                    } else {
-                        // Login failed with other errors (wrong password, etc.) - don't attempt signup
-                        console.error(`❌ ${userType.toUpperCase()} LOGIN ERROR:`, loginError?.code, loginError?.message);
-                        return {
-                            success: false,
-                            error: loginError?.code || 'unknown-error',
-                            message: getAuthErrorMessage(loginError?.code)
-                        };
-                    }
-                }
-            } catch (error) {
-                console.error('❌ AUTHENTICATION ERROR:', error?.code, error?.message);
                 return {
                     success: false,
                     error: error?.code || 'unknown-error',
@@ -334,22 +235,6 @@
             }
         };
 
-        window.testFacultyLogin = async function() {
-            const email = document.getElementById('faculty-email').value;
-            const password = document.getElementById('faculty-pass').value;
-            const resultDiv = document.getElementById('faculty-result');
-
-            resultDiv.innerHTML = '🔐 Authenticating faculty...';
-
-            const result = await signInFaculty(email, password);
-
-            if (result.success) {
-                resultDiv.innerHTML = `<span class="success">✅ ${result.message} (UID: ${result.user.uid})</span>`;
-            } else {
-                resultDiv.innerHTML = `<span class="error">❌ ${result.message}</span>`;
-            }
-        };
-
         window.testStudentSignup = async function() {
             const rollNumber = document.getElementById('student-signup-roll').value;
             const password = document.getElementById('student-signup-pass').value;
@@ -366,14 +251,14 @@
             }
         };
 
-        window.testFacultySignup = async function() {
-            const email = document.getElementById('faculty-signup-email').value;
-            const password = document.getElementById('faculty-signup-pass').value;
-            const resultDiv = document.getElementById('faculty-signup-result');
+        window.testFacultyLogin = async function() {
+            const email = document.getElementById('faculty-email').value;
+            const password = document.getElementById('faculty-pass').value;
+            const resultDiv = document.getElementById('faculty-result');
 
-            resultDiv.innerHTML = '📝 Creating faculty account...';
+            resultDiv.innerHTML = '🔐 Authenticating faculty...';
 
-            const result = await registerFaculty(email, password);
+            const result = await signInFaculty(email, password);
 
             if (result.success) {
                 resultDiv.innerHTML = `<span class="success">✅ ${result.message} (UID: ${result.user.uid})</span>`;
@@ -382,14 +267,14 @@
             }
         };
 
-        window.testUniversalAuth = async function() {
-            const identifier = document.getElementById('universal-identifier').value;
-            const password = document.getElementById('universal-password').value;
-            const resultDiv = document.getElementById('universal-result');
+        window.testFacultySignup = async function() {
+            const email = document.getElementById('faculty-signup-email').value;
+            const password = document.getElementById('faculty-signup-pass').value;
+            const resultDiv = document.getElementById('faculty-signup-result');
 
-            resultDiv.innerHTML = '🔐 Authenticating...';
+            resultDiv.innerHTML = '📝 Creating faculty account...';
 
-            const result = await authenticateUser(identifier, password);
+            const result = await registerFaculty(email, password);
 
             if (result.success) {
                 resultDiv.innerHTML = `<span class="success">✅ ${result.message} (UID: ${result.user.uid})</span>`;

@@ -21,8 +21,9 @@ import { Badge } from "@/components/ui/badge";
 import { PostQuestionDialog } from "@/components/issuehub/post-question-dialog";
 import { QuestionDetailDialog } from "@/components/issuehub/question-detail-dialog";
 import { Leaderboard } from "@/components/issuehub/leaderboard";
-import { AuthGuard } from "@/components/auth-guard";
+import AuthGuard from "@/components/auth-guard";
 import { getPosts, searchPosts, toggleUpvote, getLeaderboard } from "@/lib/issuehub-service";
+import { getAuth } from "firebase/auth";
 import { PostWithDetails, LeaderboardEntry } from "@/lib/types";
 
 // Mock questions data
@@ -194,6 +195,14 @@ export default function IssueHubPage() {
   };
 
   const handleUpvote = async (postId: string) => {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      alert("You must be logged in to upvote.");
+      return;
+    }
+
     try {
       const updatedPosts = posts.map(post => {
         if (post.id === postId) {
@@ -208,7 +217,7 @@ export default function IssueHubPage() {
       setPosts(updatedPosts);
 
       // Actually toggle the upvote in Firebase
-      await toggleUpvote(postId, 'post');
+      await toggleUpvote(currentUser.uid, postId, 'post');
     } catch (error) {
       console.error('Error toggling upvote:', error);
       // Revert the optimistic update on error

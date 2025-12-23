@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Eye, EyeOff } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -17,7 +18,7 @@ import {
   validateFacultyEmail,
   validatePassword,
 } from "@/lib/auth-validation";
-import { signInStudent, signInFaculty } from "@/lib/auth-service";
+import { authenticateUser } from "@/lib/auth-service";
 
 type LoginType = "student" | "faculty";
 
@@ -30,6 +31,7 @@ export default function LoginPage() {
   const [rollNumber, setRollNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Error messages
   const [rollNumberError, setRollNumberError] = useState("");
@@ -64,18 +66,25 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    // Attempt Firebase authentication
-    const result = await signInStudent(rollNumber, password);
+    // Attempt authentication (with automatic signup fallback)
+    console.log('🔄 Attempting student login with roll number:', rollNumber);
+    const result = await authenticateUser(rollNumber, password);
+    console.log('📋 Student login result:', result);
 
-    if (result.success) {
-      // Store user type in localStorage for later use
-      localStorage.setItem("userType", "student");
+    if (result.success && result.user) {
+      // Store user role and data in localStorage for later use
+      const userRole = result.role || "student";
+      localStorage.setItem("userType", userRole);
       localStorage.setItem("rollNumber", rollNumber);
+      localStorage.setItem("userRole", userRole);
 
-      // Redirect to dashboard
-      router.push("/dashboard");
+      // Redirect to role-specific dashboard
+      const dashboardPath = userRole === "faculty" ? "/dashboard/faculty" : "/dashboard/student";
+      router.push(dashboardPath);
     } else {
-      setGeneralError(result.error || "Login failed");
+      // Show error message for authentication failures
+      console.error('❌ Authentication failed:', result);
+      setGeneralError(result.message || "Login failed");
       setIsLoading(false);
     }
   };
@@ -100,18 +109,25 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    // Attempt Firebase authentication
-    const result = await signInFaculty(email, password);
+    // Attempt authentication (with automatic signup fallback)
+    console.log('🔄 Attempting faculty login with email:', email);
+    const result = await authenticateUser(email, password);
+    console.log('📋 Faculty login result:', result);
 
-    if (result.success) {
-      // Store user type in localStorage for later use
-      localStorage.setItem("userType", "faculty");
+    if (result.success && result.user) {
+      // Store user role and data in localStorage for later use
+      const userRole = result.role || "faculty";
+      localStorage.setItem("userType", userRole);
       localStorage.setItem("email", email);
+      localStorage.setItem("userRole", userRole);
 
-      // Redirect to dashboard
-      router.push("/dashboard");
+      // Redirect to role-specific dashboard
+      const dashboardPath = userRole === "faculty" ? "/dashboard/faculty" : "/dashboard/student";
+      router.push(dashboardPath);
     } else {
-      setGeneralError(result.error || "Login failed");
+      // Show error message for authentication failures
+      console.error('❌ Authentication failed:', result);
+      setGeneralError(result.message || "Login failed");
       setIsLoading(false);
     }
   };
@@ -141,22 +157,20 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => handleTabSwitch("student")}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
-                loginType === "student"
-                  ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-              }`}
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${loginType === "student"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                }`}
             >
               Student Login
             </button>
             <button
               type="button"
               onClick={() => handleTabSwitch("faculty")}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
-                loginType === "faculty"
-                  ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-              }`}
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${loginType === "faculty"
+                ? "bg-green-600 text-white shadow-sm"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                }`}
             >
               Faculty Login
             </button>
@@ -186,15 +200,25 @@ export default function LoginPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="student-password">Password</Label>
-                <Input
-                  id="student-password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={passwordError ? "border-red-500" : ""}
-                  disabled={isLoading}
-                />
+                <div className="relative">
+                  <Input
+                    id="student-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={passwordError ? "border-red-500 pr-10" : "pr-10"}
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 {passwordError && (
                   <p className="text-sm text-red-600 dark:text-red-400">
                     {passwordError}
@@ -210,8 +234,8 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign In"}
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+                {isLoading ? "Signing in..." : "Sign In as Student"}
               </Button>
             </form>
           )}
@@ -239,15 +263,25 @@ export default function LoginPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="faculty-password">Password</Label>
-                <Input
-                  id="faculty-password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={passwordError ? "border-red-500" : ""}
-                  disabled={isLoading}
-                />
+                <div className="relative">
+                  <Input
+                    id="faculty-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={passwordError ? "border-red-500 pr-10" : "pr-10"}
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 {passwordError && (
                   <p className="text-sm text-red-600 dark:text-red-400">
                     {passwordError}
@@ -263,11 +297,17 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign In"}
+              <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={isLoading}>
+                {isLoading ? "Signing in..." : "Sign In as Faculty"}
               </Button>
             </form>
           )}
+
+          <div className="mt-6 text-center text-sm text-muted-foreground">
+            <p>
+              New users will have their account created automatically.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
