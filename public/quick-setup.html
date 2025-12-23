@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Quick Setup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 700px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+
+        .step {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .step h3 {
+            color: #0f172a;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .step p {
+            color: #475569;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+            font-size: 14px;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+
+        .status.warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+
+        .console-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .console-link:hover {
+            text-decoration: underline;
+        }
+
+        code {
+            background: #e2e8f0;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #1e293b;
+        }
+
+        .credentials {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .credentials p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .test-login {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .test-login h3 {
+            color: #166534;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚀 Firebase Quick Setup</h1>
+        <p class="subtitle">Let's get your authentication working in 3 steps</p>
+
+        <div class="step">
+            <h3>
+                <span class="step-number">1</span>
+                Check Firebase Auth Status
+            </h3>
+            <p>First, let's see if Firebase Authentication is properly configured.</p>
+            <button onclick="checkFirebaseAuth()">Check Firebase Setup</button>
+            <div id="checkStatus" class="status"></div>
+        </div>
+
+        <div class="step">
+            <h3>
+                <span class="step-number">2</span>
+                Enable Email/Password Authentication
+            </h3>
+            <p>If not enabled, you need to enable Email/Password sign-in in Firebase Console.</p>
+            <a href="https://console.firebase.google.com/project/edusync-6927a/authentication/providers" target="_blank"
+                class="console-link">
+                Open Firebase Console →
+            </a>
+            <p style="margin-top: 10px; font-size: 13px; color: #64748b;">
+                Click "Email/Password" → Toggle "Enable" → Save
+            </p>
+        </div>
+
+        <div class="step">
+            <h3>
+                <span class="step-number">3</span>
+                Create Test User Account
+            </h3>
+            <p>Create a test student account with one click:</p>
+            <div class="credentials">
+                <p><strong>Email:</strong> <code>2410030023@klh.student</code></p>
+                <p><strong>Password:</strong> <code>Student@123</code></p>
+                <p><strong>Roll Number:</strong> <code>2410030023</code></p>
+            </div>
+            <button onclick="createTestUser()">Create Test Student Account</button>
+            <div id="createStatus" class="status"></div>
+        </div>
+
+        <div class="test-login" id="testLoginSection" style="display: none;">
+            <h3>✅ Setup Complete! Test Login Now</h3>
+            <p style="color: #166534; margin-bottom: 15px;">Your test account is ready. Try logging in:</p>
+            <button onclick="window.location.href='/auth/index.html'"
+                style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                Go to Login Page
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            doc,
+            setDoc,
+            serverTimestamp
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRPtDpV7gTzQN0gQKZqZTN4wjps-zgXnU",
+            authDomain: "edusync-6927a.firebaseapp.com",
+            projectId: "edusync-6927a",
+            storageBucket: "edusync-6927a.firebasestorage.app",
+            messagingSenderId: "252728058530",
+            appId: "1:252728058530:web:96018ca65912c6c6a2adfb"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.checkFirebaseAuth = async function () {
+            const statusDiv = document.getElementById('checkStatus');
+            const button = event.target;
+
+            button.disabled = true;
+            button.textContent = 'Checking...';
+            statusDiv.className = 'status info show';
+            statusDiv.textContent = '🔍 Checking Firebase configuration...';
+
+            try {
+                // Try to create a test connection
+                await auth.authStateReady();
+
+                statusDiv.className = 'status success show';
+                statusDiv.innerHTML = `
+                    ✅ Firebase is connected successfully!<br>
+                    <strong>Project:</strong> ${firebaseConfig.projectId}<br>
+                    <strong>Auth Domain:</strong> ${firebaseConfig.authDomain}<br><br>
+                    <strong>Next:</strong> Make sure Email/Password is enabled in Firebase Console (Step 2).
+                `;
+
+                button.textContent = 'Connected ✓';
+            } catch (error) {
+                console.error('Firebase check error:', error);
+                statusDiv.className = 'status error show';
+                statusDiv.innerHTML = `
+                    ❌ <strong>Error:</strong> ${error.message}<br><br>
+                    <strong>Error Code:</strong> ${error.code || 'Unknown'}<br><br>
+                    Please check your Firebase configuration.
+                `;
+                button.disabled = false;
+                button.textContent = 'Try Again';
+            }
+        };
+
+        window.createTestUser = async function () {
+            const statusDiv = document.getElementById('createStatus');
+            const button = event.target;
+            const testLoginSection = document.getElementById('testLoginSection');
+
+            button.disabled = true;
+            button.textContent = 'Creating Account...';
+            statusDiv.className = 'status info show';
+            statusDiv.textContent = '⏳ Creating user account in Firebase Authentication...';
+
+            try {
+                let uid;
+                let isNewUser = false;
+
+                // Try to create new user
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(
+                        auth,
+                        '2410030023@klh.student',
+                        'Student@123'
+                    );
+                    uid = userCredential.user.uid;
+                    isNewUser = true;
+
+                    statusDiv.textContent = '✅ User account created! Now creating Firestore profile...';
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (error) {
+                    if (error.code === 'auth/email-already-in-use') {
+                        // User exists, sign in to get UID
+                        statusDiv.textContent = '⚠️ User already exists. Updating profile...';
+                        const userCredential = await signInWithEmailAndPassword(
+                            auth,
+                            '2410030023@klh.student',
+                            'Student@123'
+                        );
+                        uid = userCredential.user.uid;
+                    } else if (error.code === 'auth/operation-not-allowed') {
+                        throw new Error('Email/Password authentication is not enabled. Please enable it in Firebase Console (Step 2).');
+                    } else {
+                        throw error;
+                    }
+                }
+
+                // Create/Update Firestore profile
+                await setDoc(doc(db, 'users', uid), {
+                    email: '2410030023@klh.student',
+                    role: 'student',
+                    rollNumber: '2410030023',
+                    name: 'Test Student',
+                    department: 'Computer Science',
+                    createdAt: serverTimestamp()
+                }, { merge: true });
+
+                await signOut(auth);
+
+                statusDiv.className = 'status success show';
+                statusDiv.innerHTML = `
+                    ✅ <strong>Success!</strong> Test account is ready!<br><br>
+                    <strong>User UID:</strong> <code>${uid}</code><br>
+                    <strong>Email:</strong> <code>2410030023@klh.student</code><br>
+                    <strong>Password:</strong> <code>Student@123</code><br>
+                    <strong>Role:</strong> <code>student</code><br><br>
+                    ${isNewUser ? '🎉 New user created!' : '♻️ Existing user updated!'}
+                `;
+
+                button.textContent = 'Account Created ✓';
+                testLoginSection.style.display = 'block';
+
+            } catch (error) {
+                console.error('Create user error:', error);
+                statusDiv.className = 'status error show';
+
+                let errorMessage = error.message;
+                let suggestion = '';
+
+                if (error.code === 'auth/operation-not-allowed') {
+                    suggestion = '<br><br><strong>Solution:</strong> Go to Step 2 and enable Email/Password authentication in Firebase Console.';
+                } else if (error.code === 'auth/weak-password') {
+                    suggestion = '<br><br><strong>Issue:</strong> Password is too weak. Use a stronger password.';
+                } else if (error.code === 'permission-denied') {
+                    suggestion = '<br><br><strong>Issue:</strong> Firestore permissions denied. Check your Firestore rules.';
+                }
+
+                statusDiv.innerHTML = `
+                    ❌ <strong>Error:</strong> ${errorMessage}<br>
+                    <strong>Code:</strong> ${error.code || 'Unknown'}${suggestion}
+                `;
+
+                button.disabled = false;
+                button.textContent = 'Try Again';
+            }
+        };
+    </script>
+</body>
+
+</html>

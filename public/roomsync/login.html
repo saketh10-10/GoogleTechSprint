@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoomSync Login - KLH</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 440px;
+            padding: 48px 40px;
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .logo-section h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .logo-section p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-login:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .info-box {
+            background: #f1f5f9;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 24px;
+        }
+
+        .info-box h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info-box li {
+            font-size: 13px;
+            color: #475569;
+            padding: 4px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .info-box li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #16a34a;
+            font-weight: 700;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .role-tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            background: #f1f5f9;
+            padding: 6px;
+            border-radius: 12px;
+        }
+
+        .role-tab {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #64748b;
+        }
+
+        .role-tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .role-tab.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .role-icon {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 32px 24px;
+            }
+
+            .logo-section h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="logo-section">
+            <div class="logo-icon">🏫</div>
+            <h1>RoomSync</h1>
+            <p>AI-Powered Room Allocation System</p>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <div class="role-tabs">
+            <button type="button" class="role-tab" data-role="student">
+                <span class="role-icon">🎓</span>
+                Student
+            </button>
+            <button type="button" class="role-tab active" data-role="faculty">
+                <span class="role-icon">👨‍🏫</span>
+                Faculty
+            </button>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" class="form-input" placeholder="faculty@klh.edu" required
+                    autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" class="form-input" placeholder="Enter your password" required
+                    autocomplete="current-password">
+            </div>
+
+            <button type="submit" id="loginBtn" class="btn-login">
+                Sign In
+            </button>
+        </form>
+
+        <div class="info-box" id="infoBox">
+            <h4 id="infoTitle">🔒 Access Control</h4>
+            <ul id="infoList">
+                <li>Faculty and Admin access only</li>
+                <li>Full access to room allocations</li>
+                <li>Contact admin for access issues</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>KLH University © 2024</p>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            signInWithEmailAndPassword,
+            onAuthStateChanged
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            doc,
+            getDoc
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRPtDpV7gTzQN0gQKZqZTN4wjps-zgXnU",
+            authDomain: "edusync-6927a.firebaseapp.com",
+            projectId: "edusync-6927a",
+            storageBucket: "edusync-6927a.firebasestorage.app",
+            messagingSenderId: "252728058530",
+            appId: "1:252728058530:web:96018ca65912c6c6a2adfb"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // DOM Elements
+        const loginForm = document.getElementById('loginForm');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const loginBtn = document.getElementById('loginBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const roleTabs = document.querySelectorAll('.role-tab');
+        const infoBox = document.getElementById('infoBox');
+        const infoTitle = document.getElementById('infoTitle');
+        const infoList = document.getElementById('infoList');
+
+        let selectedRole = 'faculty'; // Default role
+
+        // Role Tab Handler
+        roleTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                roleTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Get selected role
+                selectedRole = tab.getAttribute('data-role');
+
+                // Update placeholder and info box
+                if (selectedRole === 'student') {
+                    emailInput.placeholder = 'student@klh.edu';
+                    infoTitle.innerHTML = '👨‍🎓 Student Portal';
+                    infoList.innerHTML = `
+                        <li>View your course schedule</li>
+                        <li>Check room allocations</li>
+                        <li>Access study materials</li>
+                    `;
+                } else {
+                    emailInput.placeholder = 'faculty@klh.edu';
+                    infoTitle.innerHTML = '🔒 Access Control';
+                    infoList.innerHTML = `
+                        <li>Faculty and Admin access only</li>
+                        <li>Full access to room allocations</li>
+                        <li>Contact admin for access issues</li>
+                    `;
+                }
+
+                hideError();
+            });
+        });
+
+        // Check if already logged in
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // Check role before redirecting
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+
+                    if (!userDoc.exists()) {
+                        showError('User profile not found. Please contact administrator.');
+                        await auth.signOut();
+                        return;
+                    }
+
+                    const userData = userDoc.data();
+                    const userRole = userData.role;
+
+                    // Redirect based on role
+                    if (userRole === 'student') {
+                        // Redirect students to student dashboard
+                        window.location.href = '../issuehub/page.html'; // Or your student page
+                        return;
+                    }
+
+                    // Allow faculty and admin
+                    if (['faculty', 'admin'].includes(userRole)) {
+                        window.location.href = 'dashboard.html';
+                    } else {
+                        showError('Invalid user role. Access denied.');
+                        await auth.signOut();
+                    }
+
+                } catch (error) {
+                    console.error('Role check error:', error);
+                    showError('Error verifying permissions. Please try again.');
+                    await auth.signOut();
+                }
+            }
+        });
+
+        // Login Form Handler
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+
+            if (!email || !password) {
+                showError('Please enter both email and password.');
+                return;
+            }
+
+            try {
+                // Disable form
+                loginBtn.disabled = true;
+                loginBtn.innerHTML = '<span class="loading-spinner"></span>Signing in...';
+                hideError();
+
+                // Sign in
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Check user role
+                const userDoc = await getDoc(doc(db, 'users', user.uid));
+
+                if (!userDoc.exists()) {
+                    throw new Error('User profile not found. Please contact administrator.');
+                }
+
+                const userData = userDoc.data();
+                const userRole = userData.role;
+
+                // Redirect based on role and selected login type
+                if (userRole === 'student') {
+                    if (selectedRole === 'student') {
+                        // Student logged in as student - allow access to student features
+                        window.location.href = '../issuehub/page.html'; // Student dashboard
+                    } else {
+                        // Student trying to access faculty portal
+                        await auth.signOut();
+                        throw new Error('Access denied. Students cannot access the Faculty portal.');
+                    }
+                } else if (['faculty', 'admin'].includes(userRole)) {
+                    if (selectedRole === 'faculty') {
+                        // Faculty/admin logged in as faculty - allow access
+                        window.location.href = 'dashboard.html';
+                    } else {
+                        // Faculty trying to access student portal
+                        await auth.signOut();
+                        throw new Error('Faculty and Admins should use the Faculty login option.');
+                    }
+                } else {
+                    await auth.signOut();
+                    throw new Error('Invalid user role. Access denied.');
+                }
+
+                // Success - redirect
+                // (handled in role checks above)
+
+            } catch (error) {
+                console.error('Login error:', error);
+
+                // Handle specific error codes
+                let errorMsg = 'Login failed. Please try again.';
+
+                switch (error.code) {
+                    case 'auth/invalid-email':
+                        errorMsg = 'Invalid email address format.';
+                        break;
+                    case 'auth/user-disabled':
+                        errorMsg = 'This account has been disabled.';
+                        break;
+                    case 'auth/user-not-found':
+                        errorMsg = 'No account found with this email.';
+                        break;
+                    case 'auth/wrong-password':
+                        errorMsg = 'Incorrect password.';
+                        break;
+                    case 'auth/invalid-credential':
+                        errorMsg = 'Invalid email or password.';
+                        break;
+                    case 'auth/too-many-requests':
+                        errorMsg = 'Too many failed attempts. Please try again later.';
+                        break;
+                    default:
+                        errorMsg = error.message || errorMsg;
+                }
+
+                showError(errorMsg);
+
+                // Re-enable form
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        });
+
+        // Error Display Functions
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Clear error on input
+        emailInput.addEventListener('input', hideError);
+        passwordInput.addEventListener('input', hideError);
+    </script>
+</body>
+
+</html>

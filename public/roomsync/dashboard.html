@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoomSync Dashboard - KLH</title>
+    <link rel="stylesheet" href="css/roomsync.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">🏫 RoomSync Dashboard</h1>
+                <nav class="nav-menu">
+                    <a href="dashboard.html" class="nav-link active">Dashboard</a>
+                    <a href="rooms.html" class="nav-link">Rooms</a>
+                    <a href="sections.html" class="nav-link">Sections</a>
+                    <a href="allocations.html" class="nav-link">Allocations</a>
+                </nav>
+                <div class="user-info">
+                    <span id="userName" class="user-name"></span>
+                    <span id="userRole" class="user-role-badge"></span>
+                    <button id="logoutBtn" class="btn-secondary">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Welcome Section -->
+            <div class="welcome-section">
+                <h2>Welcome to RoomSync</h2>
+                <p class="subtitle">Intelligent Room Allocation System with AI-Powered Optimization</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🏛️</div>
+                    <div class="stat-content">
+                        <h3 id="totalRooms">0</h3>
+                        <p>Total Rooms</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-content">
+                        <h3 id="availableRooms">0</h3>
+                        <p>Available Rooms</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-content">
+                        <h3 id="totalSections">0</h3>
+                        <p>Sections Registered</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-content">
+                        <h3 id="totalAllocations">0</h3>
+                        <p>Active Allocations</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="section-card">
+                <h3 class="section-title">Quick Actions</h3>
+                <div class="quick-actions">
+                    <a href="rooms.html" class="action-card">
+                        <div class="action-icon">🏛️</div>
+                        <h4>Manage Rooms</h4>
+                        <p>View and manage classroom registrations</p>
+                    </a>
+                    <a href="sections.html" class="action-card">
+                        <div class="action-icon">📚</div>
+                        <h4>Manage Sections</h4>
+                        <p>Register and view class sections</p>
+                    </a>
+                    <a href="allocations.html" class="action-card">
+                        <div class="action-icon">🤖</div>
+                        <h4>AI Allocation</h4>
+                        <p>Get AI-powered room suggestions</p>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Recent Allocations -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3 class="section-title">Recent Allocations</h3>
+                    <a href="allocations.html" class="btn-outline btn-sm">View All</a>
+                </div>
+
+                <!-- Loading State -->
+                <div id="allocationsLoading" class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Loading allocations...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="allocationsEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-icon">📋</div>
+                    <p>No allocations yet</p>
+                </div>
+
+                <!-- Allocations Table -->
+                <div id="allocationsTable" class="table-container" style="display: none;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Section</th>
+                                <th>Room</th>
+                                <th>Date</th>
+                                <th>Time Slot</th>
+                                <th>Duration</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allocationsBody">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- System Features -->
+            <div class="section-card">
+                <h3 class="section-title">System Features</h3>
+                <div class="features-grid">
+                    <div class="feature-item">
+                        <div class="feature-icon">🔒</div>
+                        <h4>Role-Based Access</h4>
+                        <p>Faculty and Admin only access with strict security rules</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🤖</div>
+                        <h4>AI Optimization</h4>
+                        <p>Gemini AI powered room allocation suggestions</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">⚡</div>
+                        <h4>Conflict Prevention</h4>
+                        <p>Automatic time slot conflict detection</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📊</div>
+                        <h4>Capacity Analysis</h4>
+                        <p>Optimize room utilization with capacity insights</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📝</div>
+                        <h4>Audit Trail</h4>
+                        <p>Complete allocation history with audit logs</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🔍</div>
+                        <h4>Real-time Updates</h4>
+                        <p>Live availability status and instant notifications</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            onAuthStateChanged,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            collection,
+            query,
+            where,
+            getDocs,
+            getDoc,
+            doc,
+            orderBy,
+            limit
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRPtDpV7gTzQN0gQKZqZTN4wjps-zgXnU",
+            authDomain: "edusync-6927a.firebaseapp.com",
+            projectId: "edusync-6927a",
+            storageBucket: "edusync-6927a.firebasestorage.app",
+            messagingSenderId: "252728058530",
+            appId: "1:252728058530:web:96018ca65912c6c6a2adfb"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global State
+        let currentUser = null;
+        let userRole = null;
+
+        // DOM Elements
+        const userName = document.getElementById('userName');
+        const userRoleBadge = document.getElementById('userRole');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const totalRooms = document.getElementById('totalRooms');
+        const availableRooms = document.getElementById('availableRooms');
+        const totalSections = document.getElementById('totalSections');
+        const totalAllocations = document.getElementById('totalAllocations');
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                await checkUserRole();
+                await loadDashboardData();
+            } else {
+                window.location.href = '/login';
+            }
+        });
+
+        // Check User Role
+        async function checkUserRole() {
+            try {
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+
+                if (!userDoc.exists()) {
+                    alert('User profile not found. Please contact administrator.');
+                    await signOut(auth);
+                    return;
+                }
+
+                const userData = userDoc.data();
+                userRole = userData.role;
+
+                // Authorization check
+                if (!['faculty', 'admin'].includes(userRole)) {
+                    alert('Access denied. Faculty or Admin role required.');
+                    await signOut(auth);
+                    return;
+                }
+
+                // Update UI
+                userName.textContent = userData.email || currentUser.email;
+                userRoleBadge.textContent = userRole.toUpperCase();
+                userRoleBadge.className = `user-role-badge role-${userRole}`;
+
+            } catch (error) {
+                console.error('Error checking role:', error);
+                alert('Error verifying permissions.');
+            }
+        }
+
+        // Load Dashboard Data
+        async function loadDashboardData() {
+            try {
+                // Load all stats in parallel
+                await Promise.all([
+                    loadRoomStats(),
+                    loadSectionStats(),
+                    loadAllocationStats(),
+                    loadRecentAllocations()
+                ]);
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        // Load Room Stats
+        async function loadRoomStats() {
+            try {
+                const roomsSnapshot = await getDocs(collection(db, 'rooms'));
+                const total = roomsSnapshot.size;
+                let available = 0;
+
+                roomsSnapshot.forEach(doc => {
+                    if (doc.data().availabilityStatus === 'available') {
+                        available++;
+                    }
+                });
+
+                totalRooms.textContent = total;
+                availableRooms.textContent = available;
+
+                // Animate numbers
+                animateNumber(totalRooms, 0, total);
+                animateNumber(availableRooms, 0, available);
+
+            } catch (error) {
+                console.error('Error loading room stats:', error);
+            }
+        }
+
+        // Load Section Stats
+        async function loadSectionStats() {
+            try {
+                const sectionsSnapshot = await getDocs(collection(db, 'sections'));
+                const total = sectionsSnapshot.size;
+
+                totalSections.textContent = total;
+                animateNumber(totalSections, 0, total);
+
+            } catch (error) {
+                console.error('Error loading section stats:', error);
+            }
+        }
+
+        // Load Allocation Stats
+        async function loadAllocationStats() {
+            try {
+                const allocationsSnapshot = await getDocs(collection(db, 'allocations'));
+                const total = allocationsSnapshot.size;
+
+                totalAllocations.textContent = total;
+                animateNumber(totalAllocations, 0, total);
+
+            } catch (error) {
+                console.error('Error loading allocation stats:', error);
+            }
+        }
+
+        // Load Recent Allocations
+        async function loadRecentAllocations() {
+            const loadingState = document.getElementById('allocationsLoading');
+            const emptyState = document.getElementById('allocationsEmpty');
+            const tableContainer = document.getElementById('allocationsTable');
+            const tableBody = document.getElementById('allocationsBody');
+
+            try {
+                const allocationsRef = collection(db, 'allocations');
+                const q = query(allocationsRef, orderBy('createdAt', 'desc'), limit(5));
+                const snapshot = await getDocs(q);
+
+                if (snapshot.empty) {
+                    loadingState.style.display = 'none';
+                    emptyState.style.display = 'flex';
+                    return;
+                }
+
+                tableBody.innerHTML = '';
+
+                // Fetch section and room details
+                for (const allocationDoc of snapshot.docs) {
+                    const allocation = allocationDoc.data();
+
+                    // Get section name
+                    const sectionDoc = await getDoc(doc(db, 'sections', allocation.sectionId));
+                    const sectionName = sectionDoc.exists() ? sectionDoc.data().sectionName : 'Unknown';
+
+                    // Get room details
+                    const roomDoc = await getDoc(doc(db, 'rooms', allocation.roomId));
+                    const roomDetails = roomDoc.exists() ? roomDoc.data() : null;
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${escapeHtml(sectionName)}</td>
+                        <td>${roomDetails ? escapeHtml(roomDetails.roomNumber) : 'N/A'}</td>
+                        <td>${formatDate(allocation.allocationDate)}</td>
+                        <td>${escapeHtml(allocation.timeSlot)}</td>
+                        <td>${allocation.duration} hrs</td>
+                        <td><span class="status-badge status-available">Active</span></td>
+                    `;
+                    tableBody.appendChild(row);
+                }
+
+                loadingState.style.display = 'none';
+                tableContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading allocations:', error);
+                loadingState.style.display = 'none';
+                emptyState.style.display = 'flex';
+            }
+        }
+
+        // Animate Number
+        function animateNumber(element, start, end, duration = 1000) {
+            const range = end - start;
+            const increment = range / (duration / 16);
+            let current = start;
+
+            const timer = setInterval(() => {
+                current += increment;
+                if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+                    element.textContent = end;
+                    clearInterval(timer);
+                } else {
+                    element.textContent = Math.floor(current);
+                }
+            }, 16);
+        }
+
+        // Format Date
+        function formatDate(timestamp) {
+            if (!timestamp) return 'N/A';
+
+            if (timestamp.seconds) {
+                const date = new Date(timestamp.seconds * 1000);
+                return date.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+
+            return new Date(timestamp).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Logout
+        logoutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+            window.location.href = '/login';
+        });
+    </script>
+</body>
+
+</html>

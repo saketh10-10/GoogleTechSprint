@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Test Users - Firebase Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section h3 {
+            margin-bottom: 15px;
+            color: #0f172a;
+        }
+
+        .user-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .user-info {
+            margin-bottom: 10px;
+        }
+
+        .user-info strong {
+            color: #475569;
+            display: inline-block;
+            width: 120px;
+        }
+
+        .user-info code {
+            background: #e2e8f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .status.success {
+            background: #dcfce7;
+            color: #166534;
+            display: block;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            display: block;
+        }
+
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            display: block;
+        }
+
+        .instructions {
+            background: #fff7ed;
+            border-left: 4px solid #f59e0b;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .instructions h3 {
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+            color: #78350f;
+        }
+
+        .console-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .console-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Firebase Test Users Setup</h1>
+        <p class="subtitle">Create test users for authentication testing</p>
+
+        <div class="instructions">
+            <h3>⚠️ Important: Manual Steps Required</h3>
+            <ol>
+                <li>Go to <a href="https://console.firebase.google.com/project/edusync-6927a/authentication/users"
+                        target="_blank" class="console-link">Firebase Console - Authentication</a></li>
+                <li>Enable Email/Password sign-in if not already enabled</li>
+                <li>Create users manually in Firebase Console</li>
+                <li>Then use this page to create Firestore profiles</li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h3>👨‍🎓 Student Account</h3>
+            <div class="user-card">
+                <div class="user-info">
+                    <strong>Email:</strong> <code>2410030023@klh.student</code>
+                </div>
+                <div class="user-info">
+                    <strong>Password:</strong> <code>Student@123</code>
+                </div>
+                <div class="user-info">
+                    <strong>Roll Number:</strong> <code>2410030023</code>
+                </div>
+                <div class="user-info">
+                    <strong>Role:</strong> <code>student</code>
+                </div>
+            </div>
+            <button onclick="createStudentProfile()">Create Student Profile in Firestore</button>
+            <div id="studentStatus" class="status"></div>
+        </div>
+
+        <div class="section">
+            <h3>👨‍🏫 Faculty Account</h3>
+            <div class="user-card">
+                <div class="user-info">
+                    <strong>Email:</strong> <code>faculty@klh.edu.in</code>
+                </div>
+                <div class="user-info">
+                    <strong>Password:</strong> <code>Faculty@123</code>
+                </div>
+                <div class="user-info">
+                    <strong>Role:</strong> <code>faculty</code>
+                </div>
+            </div>
+            <button onclick="createFacultyProfile()">Create Faculty Profile in Firestore</button>
+            <div id="facultyStatus" class="status"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔑 Admin Account</h3>
+            <div class="user-card">
+                <div class="user-info">
+                    <strong>Email:</strong> <code>admin@klh.edu.in</code>
+                </div>
+                <div class="user-info">
+                    <strong>Password:</strong> <code>Admin@123</code>
+                </div>
+                <div class="user-info">
+                    <strong>Role:</strong> <code>admin</code>
+                </div>
+            </div>
+            <button onclick="createAdminProfile()">Create Admin Profile in Firestore</button>
+            <div id="adminStatus" class="status"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            doc,
+            setDoc,
+            serverTimestamp
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRPtDpV7gTzQN0gQKZqZTN4wjps-zgXnU",
+            authDomain: "edusync-6927a.firebaseapp.com",
+            projectId: "edusync-6927a",
+            storageBucket: "edusync-6927a.firebasestorage.app",
+            messagingSenderId: "252728058530",
+            appId: "1:252728058530:web:96018ca65912c6c6a2adfb"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.createStudentProfile = async function () {
+            const statusDiv = document.getElementById('studentStatus');
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Creating...';
+
+            try {
+                statusDiv.className = 'status info';
+                statusDiv.textContent = 'Creating user account...';
+
+                // Try to create the user
+                let uid;
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(
+                        auth,
+                        '2410030023@klh.student',
+                        'Student@123'
+                    );
+                    uid = userCredential.user.uid;
+                    statusDiv.textContent = 'User created! Creating Firestore profile...';
+                } catch (error) {
+                    if (error.code === 'auth/email-already-in-use') {
+                        // User exists, sign in to get UID
+                        statusDiv.textContent = 'User exists, getting UID...';
+                        const userCredential = await signInWithEmailAndPassword(
+                            auth,
+                            '2410030023@klh.student',
+                            'Student@123'
+                        );
+                        uid = userCredential.user.uid;
+                        statusDiv.textContent = 'Updating Firestore profile...';
+                    } else {
+                        throw error;
+                    }
+                }
+
+                // Create Firestore profile
+                await setDoc(doc(db, 'users', uid), {
+                    email: '2410030023@klh.student',
+                    role: 'student',
+                    rollNumber: '2410030023',
+                    name: 'Test Student',
+                    createdAt: serverTimestamp()
+                });
+
+                await signOut(auth);
+
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✅ Student profile created successfully! UID: ' + uid;
+                button.textContent = 'Profile Created ✓';
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ Error: ' + error.message;
+                button.disabled = false;
+                button.textContent = 'Create Student Profile in Firestore';
+            }
+        };
+
+        window.createFacultyProfile = async function () {
+            const statusDiv = document.getElementById('facultyStatus');
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Creating...';
+
+            try {
+                statusDiv.className = 'status info';
+                statusDiv.textContent = 'Creating user account...';
+
+                let uid;
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(
+                        auth,
+                        'faculty@klh.edu.in',
+                        'Faculty@123'
+                    );
+                    uid = userCredential.user.uid;
+                    statusDiv.textContent = 'User created! Creating Firestore profile...';
+                } catch (error) {
+                    if (error.code === 'auth/email-already-in-use') {
+                        statusDiv.textContent = 'User exists, getting UID...';
+                        const userCredential = await signInWithEmailAndPassword(
+                            auth,
+                            'faculty@klh.edu.in',
+                            'Faculty@123'
+                        );
+                        uid = userCredential.user.uid;
+                        statusDiv.textContent = 'Updating Firestore profile...';
+                    } else {
+                        throw error;
+                    }
+                }
+
+                await setDoc(doc(db, 'users', uid), {
+                    email: 'faculty@klh.edu.in',
+                    role: 'faculty',
+                    name: 'Test Faculty',
+                    department: 'Computer Science',
+                    createdAt: serverTimestamp()
+                });
+
+                await signOut(auth);
+
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✅ Faculty profile created successfully! UID: ' + uid;
+                button.textContent = 'Profile Created ✓';
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ Error: ' + error.message;
+                button.disabled = false;
+                button.textContent = 'Create Faculty Profile in Firestore';
+            }
+        };
+
+        window.createAdminProfile = async function () {
+            const statusDiv = document.getElementById('adminStatus');
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Creating...';
+
+            try {
+                statusDiv.className = 'status info';
+                statusDiv.textContent = 'Creating user account...';
+
+                let uid;
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(
+                        auth,
+                        'admin@klh.edu.in',
+                        'Admin@123'
+                    );
+                    uid = userCredential.user.uid;
+                    statusDiv.textContent = 'User created! Creating Firestore profile...';
+                } catch (error) {
+                    if (error.code === 'auth/email-already-in-use') {
+                        statusDiv.textContent = 'User exists, getting UID...';
+                        const userCredential = await signInWithEmailAndPassword(
+                            auth,
+                            'admin@klh.edu.in',
+                            'Admin@123'
+                        );
+                        uid = userCredential.user.uid;
+                        statusDiv.textContent = 'Updating Firestore profile...';
+                    } else {
+                        throw error;
+                    }
+                }
+
+                await setDoc(doc(db, 'users', uid), {
+                    email: 'admin@klh.edu.in',
+                    role: 'admin',
+                    name: 'System Admin',
+                    createdAt: serverTimestamp()
+                });
+
+                await signOut(auth);
+
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✅ Admin profile created successfully! UID: ' + uid;
+                button.textContent = 'Profile Created ✓';
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ Error: ' + error.message;
+                button.disabled = false;
+                button.textContent = 'Create Admin Profile in Firestore';
+            }
+        };
+    </script>
+</body>
+
+</html>

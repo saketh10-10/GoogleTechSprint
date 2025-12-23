@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Management - KLH</title>
+    <link rel="stylesheet" href="css/roomsync.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">🏫 Room Management</h1>
+                <nav class="nav-menu">
+                    <a href="dashboard.html" class="nav-link">Dashboard</a>
+                    <a href="rooms.html" class="nav-link active">Rooms</a>
+                    <a href="sections.html" class="nav-link">Sections</a>
+                    <a href="allocations.html" class="nav-link">Allocations</a>
+                </nav>
+                <div class="user-info">
+                    <span id="userName" class="user-name"></span>
+                    <span id="userRole" class="user-role-badge"></span>
+                    <button id="logoutBtn" class="btn-secondary">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Page Header -->
+            <div class="page-header">
+                <div>
+                    <h2>Room Management</h2>
+                    <p class="subtitle">Manage classroom and facility registrations</p>
+                </div>
+                <button id="addRoomBtn" class="btn-primary" style="display: none;">
+                    ➕ Add New Room
+                </button>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-card">
+                <div class="filter-group">
+                    <label>Room Type</label>
+                    <select id="filterType" class="filter-select">
+                        <option value="">All Types</option>
+                        <option value="classroom">Classroom</option>
+                        <option value="lab">Lab</option>
+                        <option value="seminar hall">Seminar Hall</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Availability</label>
+                    <select id="filterStatus" class="filter-select">
+                        <option value="">All Status</option>
+                        <option value="available">Available</option>
+                        <option value="unavailable">Unavailable</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Min Capacity</label>
+                    <input type="number" id="filterMinCapacity" class="filter-input" placeholder="0" min="0">
+                </div>
+                <div class="filter-group">
+                    <label>Max Capacity</label>
+                    <input type="number" id="filterMaxCapacity" class="filter-input" placeholder="999" min="0">
+                </div>
+                <button id="applyFiltersBtn" class="btn-secondary">Apply Filters</button>
+                <button id="clearFiltersBtn" class="btn-outline">Clear</button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading rooms...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <h3>Error Loading Rooms</h3>
+                <p id="errorMessage"></p>
+                <button id="retryBtn" class="btn-primary">Retry</button>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-icon">🏫</div>
+                <h3>No Rooms Found</h3>
+                <p>No rooms registered yet. Add your first room to get started.</p>
+            </div>
+
+            <!-- Rooms Grid -->
+            <div id="roomsGrid" class="rooms-grid" style="display: none;">
+                <!-- Rooms will be dynamically inserted -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Add/Edit Room Modal -->
+    <div id="roomModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add New Room</h3>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <form id="roomForm" class="modal-body">
+                <div class="form-group">
+                    <label>Room Name *</label>
+                    <input type="text" id="roomName" class="form-input" placeholder="e.g., Main Lecture Hall" required>
+                </div>
+                <div class="form-group">
+                    <label>Room Number *</label>
+                    <input type="text" id="roomNumber" class="form-input" placeholder="e.g., R-301" required>
+                </div>
+                <div class="form-group">
+                    <label>Capacity *</label>
+                    <input type="number" id="roomCapacity" class="form-input" placeholder="Number of seats" min="1"
+                        required>
+                </div>
+                <div class="form-group">
+                    <label>Room Type *</label>
+                    <select id="roomType" class="form-input" required>
+                        <option value="">Select Type</option>
+                        <option value="classroom">Classroom</option>
+                        <option value="lab">Lab</option>
+                        <option value="seminar hall">Seminar Hall</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Availability Status *</label>
+                    <select id="roomStatus" class="form-input" required>
+                        <option value="available">Available</option>
+                        <option value="unavailable">Unavailable</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="roomDescription" class="form-input" rows="3"
+                        placeholder="Optional details about the room"></textarea>
+                </div>
+                <div class="form-error" id="formError" style="display: none;"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="submitBtn">Save Room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            onAuthStateChanged,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            collection,
+            query,
+            where,
+            getDocs,
+            getDoc,
+            doc,
+            addDoc,
+            updateDoc,
+            deleteDoc,
+            serverTimestamp,
+            orderBy
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRPtDpV7gTzQN0gQKZqZTN4wjps-zgXnU",
+            authDomain: "edusync-6927a.firebaseapp.com",
+            projectId: "edusync-6927a",
+            storageBucket: "edusync-6927a.firebasestorage.app",
+            messagingSenderId: "252728058530",
+            appId: "1:252728058530:web:96018ca65912c6c6a2adfb"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global State
+        let currentUser = null;
+        let userRole = null;
+        let allRooms = [];
+        let editingRoomId = null;
+
+        // DOM Elements
+        const userName = document.getElementById('userName');
+        const userRoleBadge = document.getElementById('userRole');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const addRoomBtn = document.getElementById('addRoomBtn');
+        const loadingState = document.getElementById('loadingState');
+        const errorState = document.getElementById('errorState');
+        const emptyState = document.getElementById('emptyState');
+        const roomsGrid = document.getElementById('roomsGrid');
+        const roomModal = document.getElementById('roomModal');
+        const roomForm = document.getElementById('roomForm');
+        const closeModal = document.getElementById('closeModal');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        const retryBtn = document.getElementById('retryBtn');
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                await checkUserRole();
+                await loadRooms();
+            } else {
+                window.location.href = '/login';
+            }
+        });
+
+        // Check User Role
+        async function checkUserRole() {
+            try {
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+
+                if (!userDoc.exists()) {
+                    alert('User profile not found. Please contact administrator.');
+                    await signOut(auth);
+                    return;
+                }
+
+                const userData = userDoc.data();
+                userRole = userData.role;
+
+                // Authorization check
+                if (!['faculty', 'admin'].includes(userRole)) {
+                    alert('Access denied. Faculty or Admin role required.');
+                    await signOut(auth);
+                    return;
+                }
+
+                // Update UI
+                userName.textContent = userData.email || currentUser.email;
+                userRoleBadge.textContent = userRole.toUpperCase();
+                userRoleBadge.className = `user-role-badge role-${userRole}`;
+
+                // Show add button only for admin
+                if (userRole === 'admin') {
+                    addRoomBtn.style.display = 'block';
+                }
+
+            } catch (error) {
+                console.error('Error checking role:', error);
+                alert('Error verifying permissions.');
+            }
+        }
+
+        // Load Rooms
+        async function loadRooms() {
+            try {
+                showLoading();
+
+                const roomsRef = collection(db, 'rooms');
+                const q = query(roomsRef, orderBy('roomNumber', 'asc'));
+                const snapshot = await getDocs(q);
+
+                allRooms = [];
+                snapshot.forEach(doc => {
+                    allRooms.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+
+                if (allRooms.length === 0) {
+                    showEmpty();
+                } else {
+                    displayRooms(allRooms);
+                }
+
+            } catch (error) {
+                console.error('Error loading rooms:', error);
+                showError(error.message);
+            }
+        }
+
+        // Display Rooms
+        function displayRooms(rooms) {
+            roomsGrid.innerHTML = '';
+
+            rooms.forEach(room => {
+                const card = createRoomCard(room);
+                roomsGrid.appendChild(card);
+            });
+
+            showRooms();
+        }
+
+        // Create Room Card
+        function createRoomCard(room) {
+            const card = document.createElement('div');
+            card.className = 'room-card';
+
+            const statusClass = room.availabilityStatus === 'available' ? 'status-available' : 'status-unavailable';
+
+            card.innerHTML = `
+                <div class="room-card-header">
+                    <div>
+                        <h3 class="room-name">${escapeHtml(room.roomName)}</h3>
+                        <p class="room-number">${escapeHtml(room.roomNumber)}</p>
+                    </div>
+                    <span class="status-badge ${statusClass}">
+                        ${room.availabilityStatus === 'available' ? '✓ Available' : '✗ Unavailable'}
+                    </span>
+                </div>
+                <div class="room-card-body">
+                    <div class="room-info">
+                        <span class="info-icon">👥</span>
+                        <span class="info-text">Capacity: ${room.capacity}</span>
+                    </div>
+                    <div class="room-info">
+                        <span class="info-icon">🏛️</span>
+                        <span class="info-text">Type: ${capitalizeFirst(room.roomType)}</span>
+                    </div>
+                    ${room.description ? `<p class="room-description">${escapeHtml(room.description)}</p>` : ''}
+                </div>
+                <div class="room-card-footer">
+                    ${userRole === 'admin' ? `
+                        <button class="btn-outline btn-sm" onclick="window.editRoom('${room.id}')">✏️ Edit</button>
+                        <button class="btn-danger btn-sm" onclick="window.deleteRoom('${room.id}')">🗑️ Delete</button>
+                    ` : ''}
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Modal Functions
+        addRoomBtn.addEventListener('click', () => {
+            editingRoomId = null;
+            document.getElementById('modalTitle').textContent = 'Add New Room';
+            roomForm.reset();
+            document.getElementById('formError').style.display = 'none';
+            roomModal.style.display = 'flex';
+        });
+
+        closeModal.addEventListener('click', () => {
+            roomModal.style.display = 'none';
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            roomModal.style.display = 'none';
+        });
+
+        // Edit Room (Global function)
+        window.editRoom = async (roomId) => {
+            editingRoomId = roomId;
+            const room = allRooms.find(r => r.id === roomId);
+
+            if (!room) return;
+
+            document.getElementById('modalTitle').textContent = 'Edit Room';
+            document.getElementById('roomName').value = room.roomName;
+            document.getElementById('roomNumber').value = room.roomNumber;
+            document.getElementById('roomCapacity').value = room.capacity;
+            document.getElementById('roomType').value = room.roomType;
+            document.getElementById('roomStatus').value = room.availabilityStatus;
+            document.getElementById('roomDescription').value = room.description || '';
+            document.getElementById('formError').style.display = 'none';
+
+            roomModal.style.display = 'flex';
+        };
+
+        // Delete Room (Global function)
+        window.deleteRoom = async (roomId) => {
+            if (!confirm('Are you sure you want to delete this room? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                await deleteDoc(doc(db, 'rooms', roomId));
+                alert('Room deleted successfully.');
+                await loadRooms();
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Failed to delete room: ' + error.message);
+            }
+        };
+
+        // Form Submit
+        roomForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formError = document.getElementById('formError');
+            const submitBtn = document.getElementById('submitBtn');
+
+            try {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Saving...';
+                formError.style.display = 'none';
+
+                const roomData = {
+                    roomName: document.getElementById('roomName').value.trim(),
+                    roomNumber: document.getElementById('roomNumber').value.trim(),
+                    capacity: parseInt(document.getElementById('roomCapacity').value),
+                    roomType: document.getElementById('roomType').value,
+                    availabilityStatus: document.getElementById('roomStatus').value,
+                    description: document.getElementById('roomDescription').value.trim() || '',
+                    updatedAt: serverTimestamp(),
+                    updatedBy: currentUser.uid
+                };
+
+                if (editingRoomId) {
+                    // Update
+                    await updateDoc(doc(db, 'rooms', editingRoomId), roomData);
+                    alert('Room updated successfully.');
+                } else {
+                    // Create
+                    roomData.createdAt = serverTimestamp();
+                    roomData.createdBy = currentUser.uid;
+                    await addDoc(collection(db, 'rooms'), roomData);
+                    alert('Room added successfully.');
+                }
+
+                roomModal.style.display = 'none';
+                await loadRooms();
+
+            } catch (error) {
+                console.error('Form error:', error);
+                formError.textContent = error.message;
+                formError.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Room';
+            }
+        });
+
+        // Filters
+        applyFiltersBtn.addEventListener('click', () => {
+            const typeFilter = document.getElementById('filterType').value;
+            const statusFilter = document.getElementById('filterStatus').value;
+            const minCapacity = parseInt(document.getElementById('filterMinCapacity').value) || 0;
+            const maxCapacity = parseInt(document.getElementById('filterMaxCapacity').value) || 9999;
+
+            const filtered = allRooms.filter(room => {
+                return (
+                    (!typeFilter || room.roomType === typeFilter) &&
+                    (!statusFilter || room.availabilityStatus === statusFilter) &&
+                    (room.capacity >= minCapacity && room.capacity <= maxCapacity)
+                );
+            });
+
+            displayRooms(filtered);
+        });
+
+        clearFiltersBtn.addEventListener('click', () => {
+            document.getElementById('filterType').value = '';
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterMinCapacity').value = '';
+            document.getElementById('filterMaxCapacity').value = '';
+            displayRooms(allRooms);
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+            window.location.href = '/login';
+        });
+
+        // Retry
+        retryBtn.addEventListener('click', loadRooms);
+
+        // UI State
+        function showLoading() {
+            loadingState.style.display = 'flex';
+            errorState.style.display = 'none';
+            emptyState.style.display = 'none';
+            roomsGrid.style.display = 'none';
+        }
+
+        function showError(message) {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'flex';
+            emptyState.style.display = 'none';
+            roomsGrid.style.display = 'none';
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        function showEmpty() {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'none';
+            emptyState.style.display = 'flex';
+            roomsGrid.style.display = 'none';
+        }
+
+        function showRooms() {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'none';
+            emptyState.style.display = 'none';
+            roomsGrid.style.display = 'grid';
+        }
+
+        // Utility
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function capitalizeFirst(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+    </script>
+</body>
+
+</html>

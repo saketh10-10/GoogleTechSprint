@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Allocations - KLH</title>
+    <link rel="stylesheet" href="css/roomsync.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">🎯 Room Allocations</h1>
+                <nav class="nav-menu">
+                    <a href="dashboard.html" class="nav-link">Dashboard</a>
+                    <a href="rooms.html" class="nav-link">Rooms</a>
+                    <a href="sections.html" class="nav-link">Sections</a>
+                    <a href="allocations.html" class="nav-link active">Allocations</a>
+                </nav>
+                <div class="user-info">
+                    <span id="userName" class="user-name"></span>
+                    <span id="userRole" class="user-role-badge"></span>
+                    <button id="logoutBtn" class="btn-secondary">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Page Header -->
+            <div class="page-header">
+                <div>
+                    <h2>Room Allocations</h2>
+                    <p class="subtitle">AI-Powered Room Allocation System</p>
+                </div>
+                <button id="createAllocationBtn" class="btn-primary">
+                    🤖 Create New Allocation
+                </button>
+            </div>
+
+            <!-- Allocations List -->
+            <div class="section-card">
+                <h3 class="section-title">Active Allocations</h3>
+
+                <!-- Loading State -->
+                <div id="allocationsLoading" class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Loading allocations...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="allocationsEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-icon">🎯</div>
+                    <h3>No Allocations Found</h3>
+                    <p>Create your first allocation using AI-powered suggestions.</p>
+                </div>
+
+                <!-- Allocations Table -->
+                <div id="allocationsTable" class="table-container" style="display: none;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Section</th>
+                                <th>Room</th>
+                                <th>Date</th>
+                                <th>Time Slot</th>
+                                <th>Duration</th>
+                                <th>Created By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allocationsBody">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Create Allocation Modal -->
+    <div id="allocationModal" class="modal">
+        <div class="modal-content modal-xlarge">
+            <div class="modal-header">
+                <h3>🤖 AI-Powered Room Allocation</h3>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: Select Section -->
+                <div id="step1" class="allocation-step">
+                    <h4 class="step-title">Step 1: Select Section & Details</h4>
+
+                    <div class="form-group">
+                        <label>Select Section *</label>
+                        <select id="sectionSelect" class="form-input" required>
+                            <option value="">Choose a section</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Allocation Date *</label>
+                            <input type="date" id="allocationDate" class="form-input" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Time Slot *</label>
+                            <input type="text" id="allocationTimeSlot" class="form-input"
+                                placeholder="e.g., 9:00 AM - 10:00 AM" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Duration (hours) *</label>
+                            <input type="number" id="allocationDuration" class="form-input" min="0.5" max="8" step="0.5"
+                                placeholder="1" required>
+                        </div>
+                    </div>
+
+                    <div class="section-preview" id="sectionPreview" style="display: none;">
+                        <h5>Section Details</h5>
+                        <div class="preview-content">
+                            <p><strong>Name:</strong> <span id="previewName"></span></p>
+                            <p><strong>Department:</strong> <span id="previewDept"></span></p>
+                            <p><strong>Strength:</strong> <span id="previewStrength"></span> students</p>
+                            <p><strong>Preferred Room Type:</strong> <span id="previewRoomType"></span></p>
+                        </div>
+                    </div>
+
+                    <div class="step-footer">
+                        <button class="btn-primary" id="getAiSuggestionsBtn">
+                            🤖 Get AI Suggestions
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: AI Suggestions -->
+                <div id="step2" class="allocation-step" style="display: none;">
+                    <h4 class="step-title">Step 2: Review AI Suggestions</h4>
+
+                    <!-- Loading AI -->
+                    <div id="aiLoading" class="ai-loading">
+                        <div class="spinner"></div>
+                        <p>🤖 AI is analyzing optimal room allocations...</p>
+                        <p class="ai-subtitle">This may take a few moments</p>
+                    </div>
+
+                    <!-- AI Error -->
+                    <div id="aiError" class="error-message" style="display: none;">
+                        <p id="aiErrorMessage"></p>
+                        <button class="btn-secondary" id="retryAiBtn">Retry</button>
+                    </div>
+
+                    <!-- AI Suggestions Grid -->
+                    <div id="aiSuggestions" class="suggestions-grid" style="display: none;">
+                        <!-- Dynamic suggestion cards -->
+                    </div>
+
+                    <div class="step-footer" id="suggestionFooter" style="display: none;">
+                        <button class="btn-outline" id="backToStep1">← Back</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Confirmation -->
+                <div id="step3" class="allocation-step" style="display: none;">
+                    <h4 class="step-title">Step 3: Confirm Allocation</h4>
+
+                    <div class="confirmation-card">
+                        <h5>Selected Room</h5>
+                        <div class="confirmation-content">
+                            <p><strong>Room:</strong> <span id="confirmRoomName"></span></p>
+                            <p><strong>Capacity:</strong> <span id="confirmCapacity"></span></p>
+                            <p><strong>Section:</strong> <span id="confirmSection"></span></p>
+                            <p><strong>Date:</strong> <span id="confirmDate"></span></p>
+                            <p><strong>Time:</strong> <span id="confirmTime"></span></p>
+                            <p><strong>Duration:</strong> <span id="confirmDuration"></span> hours</p>
+                        </div>
+                    </div>
+
+                    <div class="form-error" id="allocationError" style="display: none;"></div>
+
+                    <div class="step-footer">
+                        <button class="btn-secondary" id="backToStep2">← Back to Suggestions</button>
+                        <button class="btn-primary" id="confirmAllocationBtn">
+                            ✓ Confirm Allocation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            onAuthStateChanged,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            collection,
+            query,
+            getDocs,
+            getDoc,
+            doc,
+            deleteDoc,
+            orderBy
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import {
+            getFunctions,
+            httpsCallable
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRPtDpV7gTzQN0gQKZqZTN4wjps-zgXnU",
+            authDomain: "edusync-6927a.firebaseapp.com",
+            projectId: "edusync-6927a",
+            storageBucket: "edusync-6927a.firebasestorage.app",
+            messagingSenderId: "252728058530",
+            appId: "1:252728058530:web:96018ca65912c6c6a2adfb"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const functions = getFunctions(app);
+
+        // Global State
+        let currentUser = null;
+        let userRole = null;
+        let allSections = [];
+        let selectedSection = null;
+        let selectedRoom = null;
+        let currentAllocationData = {};
+
+        // DOM Elements
+        const userName = document.getElementById('userName');
+        const userRoleBadge = document.getElementById('userRole');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const createAllocationBtn = document.getElementById('createAllocationBtn');
+        const allocationModal = document.getElementById('allocationModal');
+        const closeModal = document.getElementById('closeModal');
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                await checkUserRole();
+                await loadAllocations();
+                await loadSections();
+            } else {
+                window.location.href = '/login';
+            }
+        });
+
+        // Check User Role
+        async function checkUserRole() {
+            try {
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+
+                if (!userDoc.exists()) {
+                    alert('User profile not found. Please contact administrator.');
+                    await signOut(auth);
+                    return;
+                }
+
+                const userData = userDoc.data();
+                userRole = userData.role;
+
+                if (!['faculty', 'admin'].includes(userRole)) {
+                    alert('Access denied. Faculty or Admin role required.');
+                    await signOut(auth);
+                    return;
+                }
+
+                userName.textContent = userData.email || currentUser.email;
+                userRoleBadge.textContent = userRole.toUpperCase();
+                userRoleBadge.className = `user-role-badge role-${userRole}`;
+
+            } catch (error) {
+                console.error('Error checking role:', error);
+                alert('Error verifying permissions.');
+            }
+        }
+
+        // Load Sections
+        async function loadSections() {
+            try {
+                const sectionsSnapshot = await getDocs(collection(db, 'sections'));
+                allSections = [];
+
+                const sectionSelect = document.getElementById('sectionSelect');
+                sectionSelect.innerHTML = '<option value="">Choose a section</option>';
+
+                sectionsSnapshot.forEach(doc => {
+                    const section = { id: doc.id, ...doc.data() };
+                    allSections.push(section);
+
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = `${section.sectionName} - ${section.department}`;
+                    sectionSelect.appendChild(option);
+                });
+
+            } catch (error) {
+                console.error('Error loading sections:', error);
+            }
+        }
+
+        // Load Allocations
+        async function loadAllocations() {
+            const loadingState = document.getElementById('allocationsLoading');
+            const emptyState = document.getElementById('allocationsEmpty');
+            const tableContainer = document.getElementById('allocationsTable');
+            const tableBody = document.getElementById('allocationsBody');
+
+            try {
+                const allocationsRef = collection(db, 'allocations');
+                const q = query(allocationsRef, orderBy('createdAt', 'desc'));
+                const snapshot = await getDocs(q);
+
+                if (snapshot.empty) {
+                    loadingState.style.display = 'none';
+                    emptyState.style.display = 'flex';
+                    return;
+                }
+
+                tableBody.innerHTML = '';
+
+                for (const allocationDoc of snapshot.docs) {
+                    const allocation = allocationDoc.data();
+
+                    const sectionDoc = await getDoc(doc(db, 'sections', allocation.sectionId));
+                    const sectionName = sectionDoc.exists() ? sectionDoc.data().sectionName : 'Unknown';
+
+                    const roomDoc = await getDoc(doc(db, 'rooms', allocation.roomId));
+                    const roomDetails = roomDoc.exists() ? roomDoc.data() : null;
+
+                    const creatorDoc = await getDoc(doc(db, 'users', allocation.createdBy));
+                    const creatorEmail = creatorDoc.exists() ? creatorDoc.data().email : 'Unknown';
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${escapeHtml(sectionName)}</td>
+                        <td>${roomDetails ? escapeHtml(roomDetails.roomNumber) : 'N/A'}</td>
+                        <td>${formatDate(allocation.allocationDate)}</td>
+                        <td>${escapeHtml(allocation.timeSlot)}</td>
+                        <td>${allocation.duration} hrs</td>
+                        <td>${escapeHtml(creatorEmail)}</td>
+                        <td>
+                            <button class="btn-danger btn-sm" onclick="window.deleteAllocation('${allocationDoc.id}')">
+                                🗑️ Delete
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                }
+
+                loadingState.style.display = 'none';
+                tableContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading allocations:', error);
+                loadingState.style.display = 'none';
+                emptyState.style.display = 'flex';
+            }
+        }
+
+        // Delete Allocation (Global function)
+        window.deleteAllocation = async (allocationId) => {
+            if (!confirm('Are you sure you want to delete this allocation?')) {
+                return;
+            }
+
+            try {
+                await deleteDoc(doc(db, 'allocations', allocationId));
+                alert('Allocation deleted successfully.');
+                await loadAllocations();
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Failed to delete allocation: ' + error.message);
+            }
+        };
+
+        // Modal Control
+        createAllocationBtn.addEventListener('click', () => {
+            resetModal();
+            allocationModal.style.display = 'flex';
+        });
+
+        closeModal.addEventListener('click', () => {
+            allocationModal.style.display = 'none';
+        });
+
+        function resetModal() {
+            document.getElementById('step1').style.display = 'block';
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step3').style.display = 'none';
+            document.getElementById('sectionSelect').value = '';
+            document.getElementById('allocationDate').value = '';
+            document.getElementById('allocationTimeSlot').value = '';
+            document.getElementById('allocationDuration').value = '';
+            document.getElementById('sectionPreview').style.display = 'none';
+            selectedSection = null;
+            selectedRoom = null;
+        }
+
+        // Section Selection
+        document.getElementById('sectionSelect').addEventListener('change', (e) => {
+            const sectionId = e.target.value;
+            if (!sectionId) {
+                document.getElementById('sectionPreview').style.display = 'none';
+                return;
+            }
+
+            selectedSection = allSections.find(s => s.id === sectionId);
+            if (selectedSection) {
+                document.getElementById('previewName').textContent = selectedSection.sectionName;
+                document.getElementById('previewDept').textContent = selectedSection.department;
+                document.getElementById('previewStrength').textContent = selectedSection.classStrength;
+                document.getElementById('previewRoomType').textContent = selectedSection.preferredRoomType || 'No preference';
+                document.getElementById('sectionPreview').style.display = 'block';
+
+                // Pre-fill data
+                document.getElementById('allocationTimeSlot').value = selectedSection.timeSlot;
+                document.getElementById('allocationDuration').value = selectedSection.requiredDuration;
+            }
+        });
+
+        // Get AI Suggestions
+        document.getElementById('getAiSuggestionsBtn').addEventListener('click', async () => {
+            const sectionId = document.getElementById('sectionSelect').value;
+            const date = document.getElementById('allocationDate').value;
+            const timeSlot = document.getElementById('allocationTimeSlot').value;
+            const duration = parseFloat(document.getElementById('allocationDuration').value);
+
+            if (!sectionId || !date || !timeSlot || !duration) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+
+            currentAllocationData = {
+                sectionId,
+                allocationDate: date,
+                timeSlot,
+                duration
+            };
+
+            // Move to step 2
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+            document.getElementById('aiLoading').style.display = 'block';
+            document.getElementById('aiError').style.display = 'none';
+            document.getElementById('aiSuggestions').style.display = 'none';
+
+            try {
+                const getAiRoomSuggestions = httpsCallable(functions, 'getAiRoomSuggestions');
+                const result = await getAiRoomSuggestions({
+                    sectionId,
+                    allocationDate: date,
+                    timeSlot,
+                    duration
+                });
+
+                displayAiSuggestions(result.data.suggestions);
+
+            } catch (error) {
+                console.error('AI Error:', error);
+                document.getElementById('aiLoading').style.display = 'none';
+                document.getElementById('aiError').style.display = 'block';
+                document.getElementById('aiErrorMessage').textContent = error.message;
+            }
+        });
+
+        // Display AI Suggestions
+        function displayAiSuggestions(suggestions) {
+            const container = document.getElementById('aiSuggestions');
+            container.innerHTML = '';
+
+            suggestions.forEach((suggestion, index) => {
+                const card = document.createElement('div');
+                card.className = 'suggestion-card';
+                if (index === 0) card.classList.add('suggestion-recommended');
+
+                card.innerHTML = `
+                    ${index === 0 ? '<div class="recommendation-badge">🏆 Recommended</div>' : ''}
+                    <h5 class="suggestion-room">${escapeHtml(suggestion.roomName)}</h5>
+                    <p class="suggestion-room-number">${escapeHtml(suggestion.roomNumber)}</p>
+                    
+                    <div class="suggestion-details">
+                        <div class="detail-item">
+                            <span class="detail-icon">👥</span>
+                            <span>Capacity: ${suggestion.capacity}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">🏛️</span>
+                            <span>${capitalizeFirst(suggestion.roomType)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">📊</span>
+                            <span>Utilization: ${suggestion.utilizationPercentage}%</span>
+                        </div>
+                    </div>
+
+                    <div class="suggestion-reasoning">
+                        <strong>AI Reasoning:</strong>
+                        <p>${escapeHtml(suggestion.reasoning)}</p>
+                    </div>
+
+                    <button class="btn-primary btn-block" onclick="window.selectRoom('${suggestion.roomId}', ${JSON.stringify(suggestion).replace(/"/g, '&quot;')})">
+                        Select This Room
+                    </button>
+                `;
+
+                container.appendChild(card);
+            });
+
+            document.getElementById('aiLoading').style.display = 'none';
+            document.getElementById('aiSuggestions').style.display = 'grid';
+            document.getElementById('suggestionFooter').style.display = 'block';
+        }
+
+        // Select Room (Global function)
+        window.selectRoom = function (roomId, suggestionData) {
+            selectedRoom = {
+                roomId,
+                ...suggestionData
+            };
+
+            // Move to step 3
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step3').style.display = 'block';
+
+            document.getElementById('confirmRoomName').textContent = suggestionData.roomName;
+            document.getElementById('confirmCapacity').textContent = suggestionData.capacity;
+            document.getElementById('confirmSection').textContent = selectedSection.sectionName;
+            document.getElementById('confirmDate').textContent = currentAllocationData.allocationDate;
+            document.getElementById('confirmTime').textContent = currentAllocationData.timeSlot;
+            document.getElementById('confirmDuration').textContent = currentAllocationData.duration;
+        };
+
+        // Confirm Allocation
+        document.getElementById('confirmAllocationBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('confirmAllocationBtn');
+            const errorDiv = document.getElementById('allocationError');
+
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Creating...';
+                errorDiv.style.display = 'none';
+
+                const createRoomAllocation = httpsCallable(functions, 'createRoomAllocation');
+                await createRoomAllocation({
+                    roomId: selectedRoom.roomId,
+                    sectionId: currentAllocationData.sectionId,
+                    allocationDate: currentAllocationData.allocationDate,
+                    timeSlot: currentAllocationData.timeSlot,
+                    duration: currentAllocationData.duration
+                });
+
+                alert('✅ Room allocated successfully!');
+                allocationModal.style.display = 'none';
+                await loadAllocations();
+
+            } catch (error) {
+                console.error('Allocation error:', error);
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✓ Confirm Allocation';
+            }
+        });
+
+        // Navigation
+        document.getElementById('backToStep1').addEventListener('click', () => {
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step1').style.display = 'block';
+        });
+
+        document.getElementById('backToStep2').addEventListener('click', () => {
+            document.getElementById('step3').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+        });
+
+        document.getElementById('retryAiBtn').addEventListener('click', () => {
+            document.getElementById('getAiSuggestionsBtn').click();
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+            window.location.href = '/login';
+        });
+
+        // Utility Functions
+        function formatDate(timestamp) {
+            if (!timestamp) return 'N/A';
+
+            if (timestamp.seconds) {
+                return new Date(timestamp.seconds * 1000).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+
+            return new Date(timestamp).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function capitalizeFirst(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+    </script>
+</body>
+
+</html>

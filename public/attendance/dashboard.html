@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Today's Events - KLH Attendance System</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">📅 KLH Attendance</h1>
+                <div class="user-info">
+                    <span id="userEmail" class="user-email"></span>
+                    <button id="logoutBtn" class="btn-secondary">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h2>Today's Events</h2>
+                <p class="subtitle" id="todayDate"></p>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading today's events...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <h3>Error Loading Events</h3>
+                <p id="errorMessage"></p>
+                <button id="retryBtn" class="btn-primary">Retry</button>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-icon">📭</div>
+                <h3>No Events Today</h3>
+                <p>There are no events scheduled for today. Check back tomorrow!</p>
+            </div>
+
+            <!-- Events Grid -->
+            <div id="eventsGrid" class="events-grid" style="display: none;">
+                <!-- Events will be dynamically inserted here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            onAuthStateChanged,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            collection,
+            query,
+            where,
+            getDocs,
+            Timestamp,
+            orderBy
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase Configuration
+        // Replace with your actual Firebase config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // DOM Elements
+        const userEmailEl = document.getElementById('userEmail');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const todayDateEl = document.getElementById('todayDate');
+        const loadingState = document.getElementById('loadingState');
+        const errorState = document.getElementById('errorState');
+        const emptyState = document.getElementById('emptyState');
+        const eventsGrid = document.getElementById('eventsGrid');
+        const errorMessage = document.getElementById('errorMessage');
+        const retryBtn = document.getElementById('retryBtn');
+
+        // Set today's date
+        const today = new Date();
+        todayDateEl.textContent = today.toLocaleDateString('en-IN', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Authentication State Observer
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in
+                userEmailEl.textContent = user.email || user.displayName || 'User';
+                loadTodaysEvents();
+            } else {
+                // User is signed out - redirect to login
+                window.location.href = '/login';
+            }
+        });
+
+        // Logout Handler
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                window.location.href = '/login';
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('Failed to logout. Please try again.');
+            }
+        });
+
+        // Load Today's Events
+        async function loadTodaysEvents() {
+            try {
+                showLoading();
+
+                // Get start and end of today in Firestore Timestamp format
+                const startOfDay = new Date();
+                startOfDay.setHours(0, 0, 0, 0);
+
+                const endOfDay = new Date();
+                endOfDay.setHours(23, 59, 59, 999);
+
+                // Query Firestore for today's events
+                const eventsRef = collection(db, 'events');
+                const q = query(
+                    eventsRef,
+                    where('date', '>=', Timestamp.fromDate(startOfDay)),
+                    where('date', '<=', Timestamp.fromDate(endOfDay)),
+                    orderBy('date', 'asc')
+                );
+
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    showEmptyState();
+                    return;
+                }
+
+                // Build events array
+                const events = [];
+                querySnapshot.forEach((doc) => {
+                    events.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+
+                displayEvents(events);
+
+            } catch (error) {
+                console.error('Error loading events:', error);
+                showError(error.message || 'Failed to load events. Please try again.');
+            }
+        }
+
+        // Display Events
+        function displayEvents(events) {
+            eventsGrid.innerHTML = '';
+
+            events.forEach(event => {
+                const eventCard = createEventCard(event);
+                eventsGrid.appendChild(eventCard);
+            });
+
+            showEvents();
+        }
+
+        // Create Event Card
+        function createEventCard(event) {
+            const card = document.createElement('div');
+            card.className = 'event-card';
+            card.onclick = () => navigateToEvent(event.id);
+
+            const eventDate = event.date.toDate();
+            const eventTime = eventDate.toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            card.innerHTML = `
+                <div class="event-card-header">
+                    <h3 class="event-title">${escapeHtml(event.title || 'Untitled Event')}</h3>
+                    <span class="event-time">🕐 ${eventTime}</span>
+                </div>
+                <div class="event-card-body">
+                    <div class="event-info">
+                        <span class="info-label">📍 Venue:</span>
+                        <span class="info-value">${escapeHtml(event.venue || 'TBA')}</span>
+                    </div>
+                    <div class="event-info">
+                        <span class="info-label">📝 Description:</span>
+                        <span class="info-value">${escapeHtml(event.description || 'No description')}</span>
+                    </div>
+                </div>
+                <div class="event-card-footer">
+                    <button class="btn-primary btn-block">View Details →</button>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Navigate to Event Details
+        function navigateToEvent(eventId) {
+            window.location.href = `/event.html?id=${eventId}`;
+        }
+
+        // UI State Management
+        function showLoading() {
+            loadingState.style.display = 'flex';
+            errorState.style.display = 'none';
+            emptyState.style.display = 'none';
+            eventsGrid.style.display = 'none';
+        }
+
+        function showError(message) {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'flex';
+            emptyState.style.display = 'none';
+            eventsGrid.style.display = 'none';
+            errorMessage.textContent = message;
+        }
+
+        function showEmptyState() {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'none';
+            emptyState.style.display = 'flex';
+            eventsGrid.style.display = 'none';
+        }
+
+        function showEvents() {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'none';
+            emptyState.style.display = 'none';
+            eventsGrid.style.display = 'grid';
+        }
+
+        // Retry Button
+        retryBtn.addEventListener('click', loadTodaysEvents);
+
+        // Utility: Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+
+</html>

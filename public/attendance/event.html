@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Details - KLH Attendance System</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <button id="backBtn" class="btn-back">← Back</button>
+                <h1 class="logo">📅 Event Details</h1>
+                <button id="logoutBtn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading event details...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <h3>Error Loading Event</h3>
+                <p id="errorMessage"></p>
+                <button id="backToEventsBtn" class="btn-primary">Back to Events</button>
+            </div>
+
+            <!-- Event Details -->
+            <div id="eventDetails" class="event-details-container" style="display: none;">
+                <div class="event-details-card">
+                    <h2 id="eventTitle" class="event-title-large"></h2>
+
+                    <div class="event-meta">
+                        <div class="meta-item">
+                            <span class="meta-icon">📅</span>
+                            <div>
+                                <span class="meta-label">Date</span>
+                                <span id="eventDate" class="meta-value"></span>
+                            </div>
+                        </div>
+
+                        <div class="meta-item">
+                            <span class="meta-icon">🕐</span>
+                            <div>
+                                <span class="meta-label">Time</span>
+                                <span id="eventTime" class="meta-value"></span>
+                            </div>
+                        </div>
+
+                        <div class="meta-item">
+                            <span class="meta-icon">📍</span>
+                            <div>
+                                <span class="meta-label">Venue</span>
+                                <span id="eventVenue" class="meta-value"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="event-description">
+                        <h3>Description</h3>
+                        <p id="eventDescription"></p>
+                    </div>
+
+                    <!-- Attendance Status -->
+                    <div id="attendanceStatus" class="attendance-status" style="display: none;"></div>
+
+                    <!-- Generate QR Button -->
+                    <div class="action-section">
+                        <button id="generateQrBtn" class="btn-primary btn-large">
+                            🎫 Generate Attendance QR Code
+                        </button>
+                        <p id="qrButtonMessage" class="qr-button-message"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            onAuthStateChanged,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            doc,
+            getDoc,
+            collection,
+            query,
+            where,
+            getDocs,
+            addDoc,
+            Timestamp
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Get event ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const eventId = urlParams.get('id');
+
+        if (!eventId) {
+            window.location.href = '/attendance/dashboard.html';
+        }
+
+        // DOM Elements
+        const backBtn = document.getElementById('backBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const loadingState = document.getElementById('loadingState');
+        const errorState = document.getElementById('errorState');
+        const eventDetails = document.getElementById('eventDetails');
+        const errorMessage = document.getElementById('errorMessage');
+        const backToEventsBtn = document.getElementById('backToEventsBtn');
+        const generateQrBtn = document.getElementById('generateQrBtn');
+        const qrButtonMessage = document.getElementById('qrButtonMessage');
+        const attendanceStatus = document.getElementById('attendanceStatus');
+
+        let currentUser = null;
+        let currentEvent = null;
+
+        // Navigation
+        backBtn.addEventListener('click', () => {
+            window.location.href = '/attendance/dashboard.html';
+        });
+
+        backToEventsBtn.addEventListener('click', () => {
+            window.location.href = '/attendance/dashboard.html';
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                window.location.href = '/login';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+
+        // Authentication State Observer
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadEventDetails();
+            } else {
+                window.location.href = '/login';
+            }
+        });
+
+        // Load Event Details
+        async function loadEventDetails() {
+            try {
+                showLoading();
+
+                // Fetch event from Firestore
+                const eventRef = doc(db, 'events', eventId);
+                const eventSnap = await getDoc(eventRef);
+
+                if (!eventSnap.exists()) {
+                    throw new Error('Event not found.');
+                }
+
+                currentEvent = {
+                    id: eventSnap.id,
+                    ...eventSnap.data()
+                };
+
+                // Validate event is today
+                const eventDate = currentEvent.date.toDate();
+                const today = new Date();
+
+                const isToday = eventDate.getFullYear() === today.getFullYear() &&
+                    eventDate.getMonth() === today.getMonth() &&
+                    eventDate.getDate() === today.getDate();
+
+                if (!isToday) {
+                    throw new Error('This event is not scheduled for today.');
+                }
+
+                // Check if attendance already marked
+                await checkAttendanceStatus();
+
+                // Display event details
+                displayEventDetails();
+
+            } catch (error) {
+                console.error('Error loading event:', error);
+                showError(error.message || 'Failed to load event details.');
+            }
+        }
+
+        // Check Attendance Status
+        async function checkAttendanceStatus() {
+            try {
+                const attendanceRef = collection(db, 'attendance');
+                const q = query(
+                    attendanceRef,
+                    where('userId', '==', currentUser.uid),
+                    where('eventId', '==', eventId)
+                );
+
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    // Attendance already marked
+                    generateQrBtn.disabled = true;
+                    qrButtonMessage.textContent = '✅ Attendance already marked for this event.';
+                    qrButtonMessage.className = 'qr-button-message success';
+
+                    // Show attendance status
+                    const attendanceData = querySnapshot.docs[0].data();
+                    const scanTime = attendanceData.scanTimestamp?.toDate();
+                    attendanceStatus.innerHTML = `
+                        <div class="status-success">
+                            <span class="status-icon">✅</span>
+                            <div class="status-text">
+                                <strong>Attendance Confirmed</strong>
+                                <p>Marked on ${scanTime ? scanTime.toLocaleString('en-IN') : 'Unknown'}</p>
+                            </div>
+                        </div>
+                    `;
+                    attendanceStatus.style.display = 'block';
+                    return true;
+                }
+
+                return false;
+
+            } catch (error) {
+                console.error('Error checking attendance:', error);
+                return false;
+            }
+        }
+
+        // Display Event Details
+        function displayEventDetails() {
+            const eventDate = currentEvent.date.toDate();
+
+            document.getElementById('eventTitle').textContent = currentEvent.title || 'Untitled Event';
+            document.getElementById('eventDate').textContent = eventDate.toLocaleDateString('en-IN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            document.getElementById('eventTime').textContent = eventDate.toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            document.getElementById('eventVenue').textContent = currentEvent.venue || 'TBA';
+            document.getElementById('eventDescription').textContent = currentEvent.description || 'No description available.';
+
+            showEventDetails();
+        }
+
+        // Generate QR Code
+        generateQrBtn.addEventListener('click', async () => {
+            try {
+                generateQrBtn.disabled = true;
+                qrButtonMessage.textContent = 'Generating QR code...';
+                qrButtonMessage.className = 'qr-button-message info';
+
+                // Generate cryptographically secure nonce
+                const nonce = generateSecureNonce();
+                const now = Timestamp.now();
+                const expiresAt = Timestamp.fromMillis(now.toMillis() + (2 * 60 * 1000)); // 2 minutes
+
+                // Create QR session in Firestore
+                const qrSessionRef = collection(db, 'qr_sessions');
+                const sessionDoc = await addDoc(qrSessionRef, {
+                    userId: currentUser.uid,
+                    eventId: eventId,
+                    nonce: nonce,
+                    createdAt: now,
+                    expiresAt: expiresAt,
+                    used: false
+                });
+
+                // Navigate to QR display page
+                const qrPayload = {
+                    userId: currentUser.uid,
+                    eventId: eventId,
+                    nonce: nonce,
+                    timestamp: now.toMillis()
+                };
+
+                const qrData = encodeURIComponent(JSON.stringify(qrPayload));
+                window.location.href = `/attendance/qr.html?data=${qrData}&sessionId=${sessionDoc.id}`;
+
+            } catch (error) {
+                console.error('Error generating QR:', error);
+                qrButtonMessage.textContent = `❌ Error: ${error.message}`;
+                qrButtonMessage.className = 'qr-button-message error';
+                generateQrBtn.disabled = false;
+            }
+        });
+
+        // Generate Secure Nonce (Client-side)
+        function generateSecureNonce() {
+            const array = new Uint8Array(32);
+            crypto.getRandomValues(array);
+            return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        // UI State Management
+        function showLoading() {
+            loadingState.style.display = 'flex';
+            errorState.style.display = 'none';
+            eventDetails.style.display = 'none';
+        }
+
+        function showError(message) {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'flex';
+            eventDetails.style.display = 'none';
+            errorMessage.textContent = message;
+        }
+
+        function showEventDetails() {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'none';
+            eventDetails.style.display = 'block';
+        }
+    </script>
+</body>
+
+</html>

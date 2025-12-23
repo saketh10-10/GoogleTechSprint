@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Scanner - KLH Attendance</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        .scanner-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        #qrReader {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .scan-result {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .scan-result.success {
+            background: #dcfce7;
+            border: 2px solid #22c55e;
+            color: #166534;
+        }
+
+        .scan-result.error {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+        }
+
+        .scan-result.processing {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            color: #1e40af;
+        }
+
+        .scan-result h3 {
+            margin-bottom: 12px;
+            font-size: 20px;
+        }
+
+        .scan-result p {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">📱 QR Scanner</h1>
+                <button id="logoutBtn" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container scanner-container">
+            <div class="page-header">
+                <h2>Scan Attendance QR Code</h2>
+                <p class="subtitle">Position the QR code within the scanner frame</p>
+            </div>
+
+            <!-- QR Scanner -->
+            <div id="qrReader"></div>
+
+            <!-- Scan Result -->
+            <div id="scanResult" style="display: none;"></div>
+
+            <!-- Instructions -->
+            <div class="qr-instructions" style="margin-top: 24px;">
+                <h3>📋 Scanner Instructions</h3>
+                <ol>
+                    <li>Allow camera access when prompted</li>
+                    <li>Position the student's QR code within the frame</li>
+                    <li>Scanner will automatically detect and validate</li>
+                    <li>Wait for confirmation before next scan</li>
+                    <li>Ensure good lighting for best results</li>
+                </ol>
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            onAuthStateChanged,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFunctions,
+            httpsCallable
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const functions = getFunctions(app);
+
+        // Cloud Function
+        const validateQrScan = httpsCallable(functions, 'validateQrScan');
+
+        // DOM Elements
+        const logoutBtn = document.getElementById('logoutBtn');
+        const scanResult = document.getElementById('scanResult');
+
+        let html5QrCode = null;
+        let isProcessing = false;
+
+        // Authentication
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                initializeScanner();
+            } else {
+                window.location.href = '/login';
+            }
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                if (html5QrCode) {
+                    await html5QrCode.stop();
+                }
+                await signOut(auth);
+                window.location.href = '/login';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+
+        // Initialize QR Scanner
+        function initializeScanner() {
+            html5QrCode = new Html5Qrcode("qrReader");
+
+            html5QrCode.start(
+                { facingMode: "environment" }, // Use back camera
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                onScanSuccess,
+                onScanError
+            ).catch(err => {
+                console.error('Scanner initialization error:', err);
+                showResult('error', 'Failed to start scanner. Please check camera permissions.');
+            });
+        }
+
+        // Handle Successful Scan
+        async function onScanSuccess(decodedText, decodedResult) {
+            if (isProcessing) return;
+
+            try {
+                isProcessing = true;
+
+                // Parse QR data
+                const qrData = JSON.parse(decodedText);
+
+                // Show processing state
+                showResult('processing', 'Validating QR code...', 'Please wait');
+
+                // Pause scanner
+                await html5QrCode.pause();
+
+                // Call Cloud Function to validate
+                const result = await validateQrScan(qrData);
+
+                if (result.data.success) {
+                    showResult(
+                        'success',
+                        '✅ Attendance Marked Successfully',
+                        `Student: ${qrData.userId}<br>
+                         Event: ${result.data.eventTitle}<br>
+                         Time: ${new Date().toLocaleTimeString('en-IN')}`
+                    );
+
+                    // Resume scanner after 3 seconds
+                    setTimeout(async () => {
+                        await html5QrCode.resume();
+                        hideResult();
+                        isProcessing = false;
+                    }, 3000);
+                } else {
+                    throw new Error(result.data.message || 'Validation failed');
+                }
+
+            } catch (error) {
+                console.error('Validation error:', error);
+
+                let errorMessage = 'QR validation failed';
+                if (error.message.includes('already-exists')) {
+                    errorMessage = 'Attendance already marked for this event';
+                } else if (error.message.includes('deadline-exceeded')) {
+                    errorMessage = 'QR code has expired';
+                } else if (error.message.includes('not-found')) {
+                    errorMessage = 'Invalid QR code';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                showResult('error', '❌ Validation Failed', errorMessage);
+
+                // Resume scanner after 2 seconds
+                setTimeout(async () => {
+                    await html5QrCode.resume();
+                    hideResult();
+                    isProcessing = false;
+                }, 2000);
+            }
+        }
+
+        // Handle Scan Error (normal during scanning)
+        function onScanError(error) {
+            // Ignore normal scan errors (no QR in frame)
+            // Only log critical errors
+            if (error && !error.includes('NotFoundException')) {
+                console.warn('Scan error:', error);
+            }
+        }
+
+        // Show Scan Result
+        function showResult(type, title, message) {
+            scanResult.className = `scan-result ${type}`;
+            scanResult.innerHTML = `
+                <h3>${title}</h3>
+                <p>${message}</p>
+            `;
+            scanResult.style.display = 'block';
+        }
+
+        // Hide Scan Result
+        function hideResult() {
+            scanResult.style.display = 'none';
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', async () => {
+            if (html5QrCode) {
+                try {
+                    await html5QrCode.stop();
+                } catch (error) {
+                    console.error('Error stopping scanner:', error);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KLH Login Portal</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="login-card">
+            <div class="card-header">
+                <h1>KLH Login Portal</h1>
+                <p class="subtitle">Sign in to access your account</p>
+            </div>
+
+            <div class="card-body">
+                <!-- Tab Switcher -->
+                <div class="tab-switcher">
+                    <button type="button" class="tab-btn active" data-tab="student">
+                        Student Login
+                    </button>
+                    <button type="button" class="tab-btn" data-tab="faculty">
+                        Faculty Login
+                    </button>
+                </div>
+
+                <!-- Student Login Form -->
+                <form id="studentForm" class="login-form active">
+                    <div class="form-group">
+                        <label for="rollNumber">Roll Number</label>
+                        <input type="text" id="rollNumber" placeholder="2410030XXX" maxlength="10" autocomplete="off">
+                        <span class="error-message" id="rollNumberError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="studentPassword">Password</label>
+                        <input type="password" id="studentPassword" placeholder="Enter your password"
+                            autocomplete="current-password">
+                        <span class="error-message" id="studentPasswordError"></span>
+                    </div>
+
+                    <div class="error-banner" id="studentGeneralError"></div>
+
+                    <button type="submit" class="submit-btn" id="studentSubmitBtn">
+                        Sign In
+                    </button>
+                </form>
+
+                <!-- Faculty Login Form -->
+                <form id="facultyForm" class="login-form">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" placeholder="yourname@klh.edu.in" autocomplete="email">
+                        <span class="error-message" id="emailError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="facultyPassword">Password</label>
+                        <input type="password" id="facultyPassword" placeholder="Enter your password"
+                            autocomplete="current-password">
+                        <span class="error-message" id="facultyPasswordError"></span>
+                    </div>
+
+                    <div class="error-banner" id="facultyGeneralError"></div>
+
+                    <button type="submit" class="submit-btn" id="facultySubmitBtn">
+                        Sign In
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module" src="auth.js"></script>
+</body>
+
+</html>

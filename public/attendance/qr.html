@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance QR Code - KLH</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        /* Additional security-focused styles */
+        body.secured {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        .qr-container.blurred {
+            filter: blur(10px);
+            pointer-events: none;
+        }
+
+        .security-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(239, 68, 68, 0.95);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            z-index: 10000;
+            display: none;
+        }
+
+        .security-warning.show {
+            display: block;
+        }
+    </style>
+</head>
+
+<body class="secured">
+    <!-- Security Warning Overlay -->
+    <div id="securityWarning" class="security-warning">
+        <h2>⚠️ Security Alert</h2>
+        <p>Suspicious activity detected!</p>
+        <p>QR code has been hidden for security.</p>
+        <button id="dismissWarning" class="btn-primary">Dismiss</button>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">🎫 Attendance QR Code</h1>
+                <button id="closeBtn" class="btn-secondary">Close</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="qr-display-container">
+                <!-- Timer -->
+                <div class="qr-timer">
+                    <div class="timer-label">QR Code Expires In:</div>
+                    <div id="timerDisplay" class="timer-display">02:00</div>
+                    <div class="timer-warning">This QR code is valid for 2 minutes only</div>
+                </div>
+
+                <!-- QR Code Display -->
+                <div id="qrContainer" class="qr-container">
+                    <canvas id="qrCanvas"></canvas>
+                </div>
+
+                <!-- Security Notice -->
+                <div class="security-notice">
+                    <h3>🔒 Security Information</h3>
+                    <ul>
+                        <li>✅ This QR code is unique to you and this event</li>
+                        <li>✅ Valid for 2 minutes only</li>
+                        <li>✅ Single-use only (cannot be reused)</li>
+                        <li>⚠️ Do not share or screenshot this QR code</li>
+                        <li>⚠️ Screenshots will be detected and may invalidate the code</li>
+                    </ul>
+                </div>
+
+                <!-- Instructions -->
+                <div class="qr-instructions">
+                    <h3>📱 How to Use</h3>
+                    <ol>
+                        <li>Keep this page open and visible</li>
+                        <li>Present this QR code to the attendance scanner</li>
+                        <li>Wait for confirmation</li>
+                        <li>Do not refresh or close this page during scanning</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            onAuthStateChanged
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            doc,
+            getDoc,
+            deleteDoc
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Get QR data from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const qrDataEncoded = urlParams.get('data');
+        const sessionId = urlParams.get('sessionId');
+
+        if (!qrDataEncoded || !sessionId) {
+            window.location.href = '/attendance/dashboard.html';
+        }
+
+        const qrData = JSON.parse(decodeURIComponent(qrDataEncoded));
+
+        // DOM Elements
+        const closeBtn = document.getElementById('closeBtn');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const qrContainer = document.getElementById('qrContainer');
+        const qrCanvas = document.getElementById('qrCanvas');
+        const securityWarning = document.getElementById('securityWarning');
+        const dismissWarning = document.getElementById('dismissWarning');
+
+        let timerInterval = null;
+        let expiryTime = qrData.timestamp + (2 * 60 * 1000); // 2 minutes from creation
+        let isSecurityTriggered = false;
+
+        // ============================================
+        // SECURITY MEASURES
+        // ============================================
+
+        // Disable right-click
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            triggerSecurityAlert('Right-click disabled');
+        });
+
+        // Disable copy
+        document.addEventListener('copy', (e) => {
+            e.preventDefault();
+            triggerSecurityAlert('Copy disabled');
+        });
+
+        // Disable keyboard shortcuts (screenshot attempts)
+        document.addEventListener('keydown', (e) => {
+            // Prevent PrintScreen, Cmd+Shift+3/4 (Mac), Windows+Shift+S, etc.
+            if (
+                e.key === 'PrintScreen' ||
+                (e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4')) ||
+                (e.key === 's' && e.shiftKey && (e.metaKey || e.ctrlKey))
+            ) {
+                e.preventDefault();
+                triggerSecurityAlert('Screenshot attempt detected');
+            }
+
+            // Disable F12, Ctrl+Shift+I (DevTools)
+            if (
+                e.key === 'F12' ||
+                (e.ctrlKey && e.shiftKey && e.key === 'I')
+            ) {
+                e.preventDefault();
+            }
+        });
+
+        // Detect tab/window visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.warn('Page visibility changed - QR may be compromised');
+                triggerSecurityAlert('Tab switched - QR hidden for security');
+            }
+        });
+
+        // Detect window blur (user switched applications)
+        window.addEventListener('blur', () => {
+            console.warn('Window lost focus - potential screenshot');
+            triggerSecurityAlert('Window focus lost - QR hidden');
+        });
+
+        // Detect window focus regain
+        window.addEventListener('focus', () => {
+            if (isSecurityTriggered) {
+                dismissSecurityAlert();
+            }
+        });
+
+        // Trigger Security Alert
+        function triggerSecurityAlert(reason) {
+            console.warn('Security alert:', reason);
+            isSecurityTriggered = true;
+            qrContainer.classList.add('blurred');
+            securityWarning.classList.add('show');
+        }
+
+        // Dismiss Security Alert
+        function dismissSecurityAlert() {
+            isSecurityTriggered = false;
+            qrContainer.classList.remove('blurred');
+            securityWarning.classList.remove('show');
+        }
+
+        dismissWarning.addEventListener('click', dismissSecurityAlert);
+
+        // ============================================
+        // QR CODE GENERATION
+        // ============================================
+
+        // Authentication Check
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Verify user matches QR data
+                if (user.uid !== qrData.userId) {
+                    alert('Security error: User mismatch');
+                    window.location.href = '/attendance/dashboard.html';
+                    return;
+                }
+                generateQrCode();
+                startTimer();
+            } else {
+                window.location.href = '/login';
+            }
+        });
+
+        // Generate QR Code
+        function generateQrCode() {
+            try {
+                const qrPayloadString = JSON.stringify(qrData);
+
+                QRCode.toCanvas(qrCanvas, qrPayloadString, {
+                    width: 300,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    },
+                    errorCorrectionLevel: 'H'
+                }, (error) => {
+                    if (error) {
+                        console.error('QR generation error:', error);
+                        alert('Failed to generate QR code');
+                        window.location.href = '/attendance/dashboard.html';
+                    }
+                });
+            } catch (error) {
+                console.error('QR generation error:', error);
+                alert('Failed to generate QR code');
+            }
+        }
+
+        // ============================================
+        // TIMER MANAGEMENT
+        // ============================================
+
+        function startTimer() {
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function updateTimer() {
+            const now = Date.now();
+            const remainingMs = expiryTime - now;
+
+            if (remainingMs <= 0) {
+                // QR expired
+                clearInterval(timerInterval);
+                handleExpiry();
+                return;
+            }
+
+            const minutes = Math.floor(remainingMs / 60000);
+            const seconds = Math.floor((remainingMs % 60000) / 1000);
+
+            timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+            // Warning at 30 seconds
+            if (remainingMs <= 30000) {
+                timerDisplay.style.color = '#ef4444';
+            }
+        }
+
+        // Handle QR Expiry
+        async function handleExpiry() {
+            timerDisplay.textContent = 'EXPIRED';
+            timerDisplay.style.color = '#ef4444';
+            qrContainer.innerHTML = '<div class="qr-expired"><h2>⏱️ QR Code Expired</h2><p>This QR code is no longer valid.</p></div>';
+
+            // Optional: Delete expired session from Firestore
+            try {
+                await deleteDoc(doc(db, 'qr_sessions', sessionId));
+            } catch (error) {
+                console.error('Error deleting expired session:', error);
+            }
+
+            setTimeout(() => {
+                window.location.href = '/attendance/dashboard.html';
+            }, 3000);
+        }
+
+        // Close Button
+        closeBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to close? This QR code will be invalidated.')) {
+                clearInterval(timerInterval);
+
+                // Optional: Delete session
+                try {
+                    await deleteDoc(doc(db, 'qr_sessions', sessionId));
+                } catch (error) {
+                    console.error('Error deleting session:', error);
+                }
+
+                window.location.href = '/attendance/dashboard.html';
+            }
+        });
+
+        // Prevent accidental navigation
+        window.addEventListener('beforeunload', (e) => {
+            if (timerInterval) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // ============================================
+        // BROWSER LIMITATION NOTICE
+        // ============================================
+        console.warn(`
+        ============================================
+        SECURITY NOTICE
+        ============================================
+        Client-side screenshot prevention is NOT absolute.
+        Users can still take screenshots using:
+        - External cameras
+        - Second devices
+        - OS-level screenshot tools
+        - Browser extensions
+        
+        AUTHORITATIVE SECURITY is enforced at:
+        - Backend QR validation
+        - Single-use enforcement
+        - Time-based expiry
+        - User-event binding verification
+        ============================================
+        `);
+    </script>
+</body>
+
+</html>

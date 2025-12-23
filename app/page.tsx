@@ -43,7 +43,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <Button variant="ghost" className="hover:bg-secondary" asChild>
-              <Link href="#login">Log in</Link>
+              <Link href="/login">Log in</Link>
             </Button>
             <Button
               className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
