@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,10 +15,15 @@ import {
   ThumbsUp,
   CheckCircle,
   Clock,
+  Loader2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PostQuestionDialog } from "@/components/issuehub/post-question-dialog";
 import { QuestionDetailDialog } from "@/components/issuehub/question-detail-dialog";
+import { Leaderboard } from "@/components/issuehub/leaderboard";
+import { AuthGuard } from "@/components/auth-guard";
+import { getPosts, searchPosts, toggleUpvote, getLeaderboard } from "@/lib/issuehub-service";
+import { PostWithDetails, LeaderboardEntry } from "@/lib/types";
 
 // Mock questions data
 const questions = [
@@ -130,25 +135,117 @@ export default function IssueHubPage() {
   const [showPostDialog, setShowPostDialog] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
 
-  const filteredQuestions = questions.filter((q) => {
-    const matchesSearch =
-      q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.tags.some((tag) =>
-        tag.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  // Real data states
+  const [posts, setPosts] = useState<PostWithDetails[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
-    const matchesCategory =
-      selectedCategory === "All" || q.category === selectedCategory;
+  // Load initial data
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
-    return matchesSearch && matchesCategory;
-  });
+  const loadInitialData = async () => {
+    try {
+      setLoading(true);
+      const [postsData, leaderboardData] = await Promise.all([
+        getPosts({ limit: 20 }),
+        getLeaderboard(10)
+      ]);
 
-  const trendingQuestions = questions.filter((q) => q.trending).slice(0, 3);
-  const selectedQuestionData = questions.find((q) => q.id === selectedQuestion);
+      setPosts(postsData);
+      setLeaderboard(leaderboardData);
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle category and search changes
+  useEffect(() => {
+    if (!loading) {
+      handleSearchAndFilter();
+    }
+  }, [selectedCategory, searchQuery]);
+
+  const handleSearchAndFilter = async () => {
+    try {
+      setLoading(true);
+      let filteredPosts: PostWithDetails[];
+
+      if (searchQuery.trim()) {
+        filteredPosts = await searchPosts(searchQuery.trim(), selectedCategory === "All" ? undefined : selectedCategory);
+      } else {
+        filteredPosts = await getPosts({
+          category: selectedCategory === "All" ? undefined : selectedCategory,
+          limit: 20
+        });
+      }
+
+      setPosts(filteredPosts);
+    } catch (error) {
+      console.error('Error filtering posts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpvote = async (postId: string) => {
+    try {
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            upvotes: post.userUpvoted ? post.upvotes - 1 : post.upvotes + 1,
+            userUpvoted: !post.userUpvoted
+          };
+        }
+        return post;
+      });
+      setPosts(updatedPosts);
+
+      // Actually toggle the upvote in Firebase
+      await toggleUpvote(postId, 'post');
+    } catch (error) {
+      console.error('Error toggling upvote:', error);
+      // Revert the optimistic update on error
+      handleSearchAndFilter();
+    }
+  };
+
+  const handlePostCreated = () => {
+    // Reload posts to show the new post
+    loadInitialData();
+  };
+
+  // Get trending posts (posts with high upvotes or recent activity)
+  const trendingPosts = posts
+    .filter(post => post.upvotes > 5 || post.answersCount > 2)
+    .sort((a, b) => b.upvotes - a.upvotes)
+    .slice(0, 3);
+
+  // Find selected post for detail dialog
+  const selectedPostData = posts.find((post) => post.id === selectedQuestion);
+
+  if (loading) {
+    return (
+      <AuthGuard>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+            <p className="text-muted-foreground">Loading IssueHub...</p>
+          </div>
+        </div>
+      </AuthGuard>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-300">
+    <AuthGuard>
+      <div className="min-h-screen bg-background transition-colors duration-300">
       {/* Navigation */}
       <nav className="border-b border-border backdrop-blur-sm bg-background/80 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -226,13 +323,13 @@ export default function IssueHubPage() {
               ))}
             </div>
 
-            {/* Questions List */}
+            {/* Posts List */}
             <div className="space-y-4">
-              {filteredQuestions.map((question) => (
+              {posts.map((post) => (
                 <Card
-                  key={question.id}
+                  key={post.id}
                   className="p-6 bg-card border-secondary hover:border-primary/50 transition-all duration-200 cursor-pointer"
-                  onClick={() => setSelectedQuestion(question.id)}
+                  onClick={() => setSelectedQuestion(post.id)}
                 >
                   <div className="flex items-start gap-4">
                     {/* Vote Section */}
@@ -240,23 +337,30 @@ export default function IssueHubPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                        onClick={(e) => e.stopPropagation()}
+                        className={`h-8 w-8 hover:bg-primary/10 ${
+                          post.userUpvoted
+                            ? "text-primary bg-primary/10"
+                            : "text-muted-foreground hover:text-primary"
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpvote(post.id);
+                        }}
                       >
                         <ThumbsUp className="w-4 h-4" />
                       </Button>
                       <span className="text-sm font-medium text-foreground">
-                        {question.upvotes}
+                        {post.upvotes}
                       </span>
                     </div>
 
-                    {/* Question Content */}
+                    {/* Post Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4 mb-2">
                         <h3 className="text-lg font-medium text-foreground hover:text-primary transition-colors duration-200">
-                          {question.title}
+                          {post.title}
                         </h3>
-                        {question.trending && (
+                        {post.isTrending && (
                           <Badge className="bg-primary/10 text-primary border-primary/20 flex-shrink-0">
                             <TrendingUp className="w-3 h-3 mr-1" />
                             Trending
@@ -265,18 +369,18 @@ export default function IssueHubPage() {
                       </div>
 
                       <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                        {question.content}
+                        {post.description}
                       </p>
 
                       <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
                             <span className="text-xs font-medium text-primary">
-                              {question.authorAvatar}
+                              {post.author.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <span className="text-xs text-muted-foreground">
-                            {question.author}
+                            {post.author.name}
                           </span>
                         </div>
 
@@ -286,14 +390,14 @@ export default function IssueHubPage() {
                           variant="outline"
                           className="border-secondary text-foreground text-xs"
                         >
-                          {question.category}
+                          {post.category}
                         </Badge>
 
                         <span className="text-xs text-muted-foreground">•</span>
 
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="w-3 h-3" />
-                          <span>{question.timeAgo}</span>
+                          <span>{new Date(post.createdAt).toLocaleDateString()}</span>
                         </div>
 
                         <span className="text-xs text-muted-foreground ml-auto">
@@ -304,11 +408,11 @@ export default function IssueHubPage() {
                           <div className="flex items-center gap-1">
                             <MessageCircle className="w-4 h-4 text-muted-foreground" />
                             <span className="text-xs text-muted-foreground">
-                              {question.answers} answers
+                              {post.answersCount} answers
                             </span>
                           </div>
 
-                          {question.status === "answered" && (
+                          {post.status === "answered" && (
                             <div className="flex items-center gap-1 text-green-500">
                               <CheckCircle className="w-4 h-4" />
                               <span className="text-xs">Answered</span>
@@ -318,7 +422,7 @@ export default function IssueHubPage() {
                       </div>
 
                       <div className="flex flex-wrap gap-1.5 mt-3">
-                        {question.tags.map((tag, index) => (
+                        {post.tags.map((tag, index) => (
                           <span
                             key={index}
                             className="text-xs px-2 py-1 rounded-md bg-secondary text-foreground"
@@ -347,7 +451,7 @@ export default function IssueHubPage() {
                     Total Questions
                   </span>
                   <span className="text-lg font-medium text-foreground">
-                    1,247
+                    {posts.length > 0 ? posts.length : '0'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -355,19 +459,21 @@ export default function IssueHubPage() {
                     Answered
                   </span>
                   <span className="text-lg font-medium text-green-500">
-                    892
+                    {posts.filter(p => p.status === 'answered').length}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">
-                    Active Users
+                    Active Contributors
                   </span>
-                  <span className="text-lg font-medium text-primary">342</span>
+                  <span className="text-lg font-medium text-primary">
+                    {leaderboard.length > 0 ? leaderboard.length : '0'}
+                  </span>
                 </div>
               </div>
             </Card>
 
-            {/* Trending Questions */}
+            {/* Trending Posts */}
             <Card className="p-6 bg-card border-secondary">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-5 h-5 text-primary" />
@@ -376,26 +482,34 @@ export default function IssueHubPage() {
                 </h3>
               </div>
               <div className="space-y-3">
-                {trendingQuestions.map((question) => (
+                {trendingPosts.length > 0 ? trendingPosts.map((post) => (
                   <div
-                    key={question.id}
+                    key={post.id}
                     className="p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors duration-200 cursor-pointer"
-                    onClick={() => setSelectedQuestion(question.id)}
+                    onClick={() => setSelectedQuestion(post.id)}
                   >
                     <p className="text-sm text-foreground mb-2 line-clamp-2">
-                      {question.title}
+                      {post.title}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <ThumbsUp className="w-3 h-3" />
-                      <span>{question.upvotes}</span>
+                      <span>{post.upvotes}</span>
                       <span>•</span>
                       <MessageCircle className="w-3 h-3" />
-                      <span>{question.answers}</span>
+                      <span>{post.answersCount}</span>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-center text-muted-foreground py-4">
+                    <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No trending posts yet</p>
+                  </div>
+                )}
               </div>
             </Card>
+
+            {/* Leaderboard */}
+            <Leaderboard />
 
             {/* Guidelines */}
             <Card className="p-6 bg-card border-secondary">
@@ -429,20 +543,19 @@ export default function IssueHubPage() {
       <PostQuestionDialog
         open={showPostDialog}
         onOpenChange={setShowPostDialog}
-        onPost={() => {
-          setShowPostDialog(false);
-          // In production, add new question here
-        }}
+        onPost={handlePostCreated}
       />
 
       {/* Question Detail Dialog */}
-      {selectedQuestionData && (
+      {selectedPostData && (
         <QuestionDetailDialog
-          question={selectedQuestionData}
+          question={selectedPostData}
           open={!!selectedQuestion}
           onOpenChange={(open) => !open && setSelectedQuestion(null)}
         />
       )}
     </div>
+    </AuthGuard>
   );
 }
+

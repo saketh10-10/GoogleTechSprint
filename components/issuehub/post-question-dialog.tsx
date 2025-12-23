@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { X } from "lucide-react"
+import { X, Loader2 } from "lucide-react"
+import { createPost } from "@/lib/issuehub-service"
+import { getAuth } from "firebase/auth"
 
 interface PostQuestionDialogProps {
   open: boolean
@@ -24,17 +26,51 @@ export function PostQuestionDialog({ open, onOpenChange, onPost }: PostQuestionD
   const [category, setCategory] = useState("")
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In production, submit question data to backend
-    onPost()
-    // Reset form
-    setTitle("")
-    setContent("")
-    setCategory("")
-    setTags([])
-    setTagInput("")
+    if (isSubmitting) return
+
+    const auth = getAuth()
+    const user = auth.currentUser
+
+    if (!user) {
+      alert("Authentication Required: You must be logged in to post questions.")
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      await createPost({
+        title: title.trim(),
+        description: content.trim(),
+        authorId: user.uid,
+        authorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
+        category,
+        tags,
+        status: 'open',
+        isTrending: false
+      })
+
+      alert("Question Posted! Your question has been shared with the community.")
+      console.log('Question posted successfully')
+
+      onPost()
+      // Reset form
+      setTitle("")
+      setContent("")
+      setCategory("")
+      setTags([])
+      setTagInput("")
+      onOpenChange(false)
+    } catch (error) {
+      console.error('Error posting question:', error)
+      alert("Failed to post question. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const addTag = () => {
@@ -177,9 +213,16 @@ export function PostQuestionDialog({ open, onOpenChange, onPost }: PostQuestionD
             <Button
               type="submit"
               className="flex-1 bg-primary hover:bg-primary/90 text-white"
-              disabled={!title || !content || !category}
+              disabled={!title || !content || !category || isSubmitting}
             >
-              Post Question
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                "Post Question"
+              )}
             </Button>
           </div>
         </form>

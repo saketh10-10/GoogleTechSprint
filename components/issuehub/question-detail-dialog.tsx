@@ -1,128 +1,170 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { ThumbsUp, MessageCircle, Clock, CheckCircle, Send } from "lucide-react"
+import { ThumbsUp, MessageCircle, Clock, CheckCircle, Send, Loader2 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-
-interface Question {
-  id: string
-  title: string
-  content: string
-  author: string
-  authorAvatar: string
-  category: string
-  tags: string[]
-  upvotes: number
-  answers: number
-  status: "open" | "answered"
-  timeAgo: string
-}
+import { PostWithDetails, AnswerWithDetails } from "@/lib/types"
+import { createAnswer, toggleUpvote } from "@/lib/issuehub-service"
+import { getAuth } from "firebase/auth"
 
 interface QuestionDetailDialogProps {
-  question: Question
+  question: PostWithDetails
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-// Mock answers
-const mockAnswers = [
-  {
-    id: "a1",
-    author: "Prof. Amit Shah",
-    authorAvatar: "AS",
-    content:
-      "You can access the library database by visiting library.college.edu and logging in with your college credentials. Make sure you're connected to the VPN if accessing from off-campus.",
-    upvotes: 12,
-    timeAgo: "1 hour ago",
-    isAccepted: true,
-  },
-  {
-    id: "a2",
-    author: "Meera Joshi",
-    authorAvatar: "MJ",
-    content:
-      "I had the same issue last week. Download the FortiClient VPN app, install it, and use the credentials sent to your college email. Then you can access all resources.",
-    upvotes: 8,
-    timeAgo: "2 hours ago",
-    isAccepted: false,
-  },
-]
-
 export function QuestionDetailDialog({ question, open, onOpenChange }: QuestionDetailDialogProps) {
-  const [answer, setAnswer] = useState("")
+  const [answers, setAnswers] = useState<AnswerWithDetails[]>(question.answers || []);
+  const [newAnswer, setNewAnswer] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleSubmitAnswer = (e: React.FormEvent) => {
-    e.preventDefault()
-    // In production, submit answer to backend
-    setAnswer("")
-  }
+  // Load answers when dialog opens
+  useEffect(() => {
+    if (open && question.id) {
+      setLoading(true);
+      // Initial answers are passed from parent
+      setAnswers(question.answers || []);
+      setLoading(false);
+    }
+  }, [open, question.id, question.answers]);
+
+  const handleSubmitAnswer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAnswer.trim() || isSubmitting) return;
+
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      alert("You must be logged in to answer questions.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createAnswer({
+        postId: question.id,
+        content: newAnswer.trim(),
+        authorId: user.uid,
+        authorName: user.displayName || user.email?.split('@')[0] || 'Anonymous'
+      });
+
+      setNewAnswer("");
+      alert("Answer posted successfully!");
+      // In a real app, you'd refresh the answers or use real-time updates
+    } catch (error) {
+      console.error('Error posting answer:', error);
+      alert("Failed to post answer. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpvote = async (answerId: string, currentUpvoted: boolean) => {
+    try {
+      const newUpvotedState = await toggleUpvote(answerId, 'answer');
+
+      // Update local state optimistically
+      setAnswers(prevAnswers =>
+        prevAnswers.map(answer =>
+          answer.id === answerId
+            ? {
+                ...answer,
+                upvotes: newUpvotedState ? answer.upvotes + 1 : answer.upvotes - 1,
+                userUpvoted: newUpvotedState
+              }
+            : answer
+        )
+      );
+    } catch (error) {
+      console.error('Error toggling upvote:', error);
+      // Reload answers on error
+      setAnswers(question.answers || []);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-secondary text-white max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-card border-secondary text-white max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-4">
-            <DialogTitle className="text-xl text-white text-balance pr-4">{question.title}</DialogTitle>
-            <Badge
-              variant="outline"
-              className={
-                question.status === "answered"
-                  ? "border-green-500/30 text-green-500 bg-green-500/10 flex-shrink-0"
-                  : "border-primary/30 text-primary bg-primary/10 flex-shrink-0"
-              }
-            >
-              {question.status === "answered" ? "Answered" : "Open"}
-            </Badge>
-          </div>
+          <DialogTitle className="text-xl text-white">{question.title}</DialogTitle>
         </DialogHeader>
 
+        {/* Question Content */}
         <div className="space-y-6">
-          {/* Question Details */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <span className="text-sm font-medium text-primary">{question.authorAvatar}</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-white">{question.author}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  <span>{question.timeAgo}</span>
-                  <span>•</span>
-                  <Badge variant="outline" className="border-secondary text-foreground text-xs">
-                    {question.category}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-muted-foreground leading-relaxed">{question.content}</p>
-
-            <div className="flex flex-wrap gap-1.5">
-              {question.tags.map((tag, index) => (
-                <span key={index} className="text-xs px-2 py-1 rounded-md bg-secondary text-foreground">
-                  #{tag}
-                </span>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-4">
+          <div className="flex items-start gap-4">
+            {/* Question Vote Section */}
+            <div className="flex flex-col items-center gap-1 pt-1">
               <Button
                 variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-primary hover:bg-primary/10"
+                size="icon"
+                className={`h-8 w-8 hover:bg-primary/10 ${
+                  question.userUpvoted
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-primary"
+                }`}
               >
-                <ThumbsUp className="w-4 h-4 mr-2" />
-                {question.upvotes}
+                <ThumbsUp className="w-4 h-4" />
               </Button>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MessageCircle className="w-4 h-4" />
-                <span>{question.answers} answers</span>
+              <span className="text-sm font-medium text-foreground">
+                {question.upvotes}
+              </span>
+            </div>
+
+            {/* Question Content */}
+            <div className="flex-1">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <span className="text-sm font-medium text-primary">
+                      {question.author.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-foreground">
+                      {question.author.name}
+                    </span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      <span>{new Date(question.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className="border-secondary text-foreground text-xs"
+                  >
+                    {question.category}
+                  </Badge>
+                  {question.status === "answered" && (
+                    <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Answered
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-sm text-muted-foreground mb-4">
+                {question.description}
+              </p>
+
+              <div className="flex flex-wrap gap-1.5">
+                {question.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="text-xs px-2 py-1 rounded-md bg-secondary text-foreground"
+                  >
+                    #{tag}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -130,69 +172,126 @@ export function QuestionDetailDialog({ question, open, onOpenChange }: QuestionD
           <Separator className="bg-secondary" />
 
           {/* Answers Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium text-white">{mockAnswers.length} Answers</h3>
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <MessageCircle className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-medium text-foreground">
+                Answers ({answers.length})
+              </h3>
+            </div>
 
-            {mockAnswers.map((ans) => (
-              <div
-                key={ans.id}
-                className={`p-4 rounded-xl ${
-                  ans.isAccepted ? "bg-green-500/5 border border-green-500/20" : "bg-secondary/50"
-                }`}
-              >
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
-                    <span className="text-xs font-medium text-accent">{ans.authorAvatar}</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-white">{ans.author}</p>
-                      {ans.isAccepted && (
-                        <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Accepted
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      <span>{ans.timeAgo}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-sm text-muted-foreground leading-relaxed mb-3">{ans.content}</p>
-
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground hover:text-accent hover:bg-accent/10 h-8"
-                  >
-                    <ThumbsUp className="w-3 h-3 mr-2" />
-                    {ans.upvotes}
-                  </Button>
-                </div>
+            {loading ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-primary" />
+                <p className="text-sm text-muted-foreground">Loading answers...</p>
               </div>
-            ))}
+            ) : (
+              <div className="space-y-4">
+                {answers.map((answer) => (
+                  <div key={answer.id} className="flex items-start gap-4">
+                    {/* Answer Vote Section */}
+                    <div className="flex flex-col items-center gap-1 pt-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-8 w-8 hover:bg-primary/10 ${
+                          answer.userUpvoted
+                            ? "text-primary bg-primary/10"
+                            : "text-muted-foreground hover:text-primary"
+                        }`}
+                        onClick={() => handleUpvote(answer.id, answer.userUpvoted || false)}
+                      >
+                        <ThumbsUp className="w-4 h-4" />
+                      </Button>
+                      <span className="text-sm font-medium text-foreground">
+                        {answer.upvotes}
+                      </span>
+                    </div>
+
+                    {/* Answer Content */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                          <span className="text-xs font-medium text-primary">
+                            {answer.author.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium text-foreground">
+                          {answer.author.name}
+                        </span>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="w-3 h-3" />
+                          <span>{new Date(answer.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        {answer.isAccepted && (
+                          <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-xs">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Accepted Answer
+                          </Badge>
+                        )}
+                      </div>
+
+                      <p className="text-sm text-muted-foreground">
+                        {answer.content}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+                {answers.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">No answers yet. Be the first to help!</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <Separator className="bg-secondary" />
 
-          {/* Answer Form */}
+          {/* Add Answer Section */}
           <div>
-            <h3 className="text-lg font-medium text-white mb-4">Your Answer</h3>
+            <h3 className="text-lg font-medium text-foreground mb-4">
+              Your Answer
+            </h3>
             <form onSubmit={handleSubmitAnswer} className="space-y-4">
               <Textarea
                 placeholder="Share your knowledge and help others..."
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                className="bg-secondary border-secondary text-white placeholder:text-muted-foreground min-h-[100px]"
+                value={newAnswer}
+                onChange={(e) => setNewAnswer(e.target.value)}
+                className="bg-secondary border-secondary text-white placeholder:text-muted-foreground min-h-[120px]"
+                required
+                disabled={isSubmitting}
               />
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-white" disabled={!answer.trim()}>
-                <Send className="w-4 h-4 mr-2" />
-                Post Answer
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-secondary hover:bg-secondary bg-transparent"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-primary hover:bg-primary/90 text-white"
+                  disabled={!newAnswer.trim() || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Posting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Post Answer
+                    </>
+                  )}
+                </Button>
+              </div>
             </form>
           </div>
         </div>
