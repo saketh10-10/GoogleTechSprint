@@ -24,13 +24,15 @@ export const signInStudent = async (rollNumber: string, password: string): Promi
   try {
     // Convert roll number to email format for Firebase
     const email = `${rollNumber}@klh.student`;
+    console.log('Attempting student login with email:', email);
     const userCredential: UserCredential = await signInWithEmailAndPassword(auth, email, password);
-    
+
     return {
       success: true,
       user: userCredential.user
     };
   } catch (error: any) {
+    console.error('Firebase Auth Error (Student):', error.code, error.message);
     return {
       success: false,
       error: getAuthErrorMessage(error.code)
@@ -43,13 +45,15 @@ export const signInStudent = async (rollNumber: string, password: string): Promi
  */
 export const signInFaculty = async (email: string, password: string): Promise<AuthResult> => {
   try {
+    console.log('Attempting faculty login with email:', email);
     const userCredential: UserCredential = await signInWithEmailAndPassword(auth, email, password);
-    
+
     return {
       success: true,
       user: userCredential.user
     };
   } catch (error: any) {
+    console.error('Firebase Auth Error (Faculty):', error.code, error.message);
     return {
       success: false,
       error: getAuthErrorMessage(error.code)

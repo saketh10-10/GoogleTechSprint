@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Auth Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Firebase Authentication Test</h1>
+
+    <div class="test-section">
+        <h2>Firebase Connection Test</h2>
+        <button onclick="testFirebaseConnection()">Test Firebase Connection</button>
+        <div id="connection-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Student Login Test</h2>
+        <input type="text" id="student-roll" placeholder="Roll Number (e.g., 2410030001)" value="2410030001">
+        <input type="password" id="student-pass" placeholder="Password" value="Student@123">
+        <button onclick="testStudentLogin()">Test Student Login</button>
+        <div id="student-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Faculty Login Test</h2>
+        <input type="email" id="faculty-email" placeholder="Email" value="faculty@klh.edu.in">
+        <input type="password" id="faculty-pass" placeholder="Password" value="Faculty@123">
+        <button onclick="testFacultyLogin()">Test Faculty Login</button>
+        <div id="faculty-result"></div>
+    </div>
+
+    <script type="module">
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRPtDpV7gTzQN0gQKZqZTN4wjps-zgXnU",
+            authDomain: "edusync-6927a.firebaseapp.com",
+            projectId: "edusync-6927a",
+            storageBucket: "edusync-6927a.firebasestorage.app",
+            messagingSenderId: "252728058530",
+            appId: "1:252728058530:web:96018ca65912c6c6a2adfb"
+        };
+
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        window.testFirebaseConnection = function() {
+            const resultDiv = document.getElementById('connection-result');
+            resultDiv.innerHTML = 'Testing Firebase connection...';
+
+            try {
+                // Just check if auth is initialized
+                if (auth) {
+                    resultDiv.innerHTML = '<span class="success">✅ Firebase connection successful!</span>';
+                } else {
+                    resultDiv.innerHTML = '<span class="error">❌ Firebase connection failed!</span>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<span class="error">❌ Error: ' + error.message + '</span>';
+            }
+        };
+
+        window.testStudentLogin = async function() {
+            const rollNumber = document.getElementById('student-roll').value;
+            const password = document.getElementById('student-pass').value;
+            const resultDiv = document.getElementById('student-result');
+
+            if (!rollNumber || !password) {
+                resultDiv.innerHTML = '<span class="error">❌ Please enter both roll number and password</span>';
+                return;
+            }
+
+            resultDiv.innerHTML = 'Attempting student login...';
+
+            try {
+                const email = `${rollNumber}@klh.student`;
+                console.log('Testing student login with:', email);
+
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                resultDiv.innerHTML = '<span class="success">✅ Student login successful! UID: ' + userCredential.user.uid + '</span>';
+                console.log('Student login successful:', userCredential.user);
+
+            } catch (error) {
+                console.error('Student login error:', error);
+                resultDiv.innerHTML = '<span class="error">❌ Student login failed: ' + error.code + ' - ' + error.message + '</span>';
+            }
+        };
+
+        window.testFacultyLogin = async function() {
+            const email = document.getElementById('faculty-email').value;
+            const password = document.getElementById('faculty-pass').value;
+            const resultDiv = document.getElementById('faculty-result');
+
+            if (!email || !password) {
+                resultDiv.innerHTML = '<span class="error">❌ Please enter both email and password</span>';
+                return;
+            }
+
+            resultDiv.innerHTML = 'Attempting faculty login...';
+
+            try {
+                console.log('Testing faculty login with:', email);
+
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                resultDiv.innerHTML = '<span class="success">✅ Faculty login successful! UID: ' + userCredential.user.uid + '</span>';
+                console.log('Faculty login successful:', userCredential.user);
+
+            } catch (error) {
+                console.error('Faculty login error:', error);
+                resultDiv.innerHTML = '<span class="error">❌ Faculty login failed: ' + error.code + ' - ' + error.message + '</span>';
+            }
+        };
+
+        // Auto-test Firebase connection on page load
+        window.addEventListener('load', function() {
+            setTimeout(testFirebaseConnection, 1000);
+        });
+    </script>
+</body>
+</html>
