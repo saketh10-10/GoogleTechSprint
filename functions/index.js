@@ -969,15 +969,15 @@ Given the following details:
 
 Available Rooms:
 ${availableRooms
-  .map(
-    (room, index) => `
+          .map(
+            (room, index) => `
 ${index + 1}. ${room.roomName} (${room.roomNumber})
    - Type: ${room.roomType}
    - Capacity: ${room.capacity}
    - Utilization: ${Math.round((classStrength / room.capacity) * 100)}%
 `
-  )
-  .join("\n")}
+          )
+          .join("\n")}
 
 Task: Suggest the top 3 most suitable rooms with reasoning.
 
@@ -1691,10 +1691,16 @@ exports.upvoteAnswer = functions.https.onCall(async (data, context) => {
   }
 });
 
-// GENERATE LEADERBOARD FUNCTION
-exports.generateLeaderboard = functions.https.onCall(async (data, context) => {
-  // Check authentication - anyone can view leaderboard but only backend should generate
-  if (!context.auth) {
+// Import v2 https for better CORS support
+const { onCall: onCallV2 } = require("firebase-functions/v2/https");
+
+// GENERATE LEADERBOARD FUNCTION - Updated to v2 for robust CORS handling
+exports.generateLeaderboard = onCallV2({
+  cors: true,
+  maxInstances: 10
+}, async (request) => {
+  // Check authentication
+  if (!request.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
       "Authentication required."
@@ -1702,6 +1708,7 @@ exports.generateLeaderboard = functions.https.onCall(async (data, context) => {
   }
 
   try {
+    console.log("Generating leaderboard...");
     // Get all users with their metrics
     const usersSnapshot = await db.collection("users")
       .where("role", "==", "student")

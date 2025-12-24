@@ -77,8 +77,8 @@ const mockCreateUserWithEmailAndPassword = async (email: string, password: strin
 
   return {
     user: mockUser as any,
-    providerId: null,
-    operationType: 'signUp'
+    providerId: '',
+    operationType: 'signIn'
   };
 };
 

@@ -32,12 +32,11 @@ export default function StudentDashboardPage() {
       const roomsRef = collection(db, 'rooms');
       const q = query(roomsRef, orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      const roomsData = querySnapshot.docs
+      const roomsData = (querySnapshot.docs
         .map(doc => ({
           ...doc.data(),
           roomId: doc.id
-        })) as Room[]
-        .filter(room => room.isActive); // Only show active rooms
+        })) as Room[]).filter(room => room.isActive); // Only show active rooms
 
       setRooms(roomsData);
 

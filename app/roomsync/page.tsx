@@ -67,6 +67,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Data state
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -160,12 +161,11 @@ const RoomSyncPage = memo(function RoomSyncPage() {
           // Store role locally for offline access
           localStorage.setItem('userRole', userRole);
 
-          if (userRole === 'faculty' || userRole === 'admin') {
-            setIsAuthorized(true);
-          } else {
-            // Students cannot access RoomSync
-            router.push('/unauthorized');
-            return;
+          setUserRole(userRole);
+          setIsAuthorized(true);
+
+          if (userRole === 'student') {
+            setActiveTab('dashboard');
           }
         } else {
           // User document doesn't exist - redirect to login
@@ -183,10 +183,15 @@ const RoomSyncPage = memo(function RoomSyncPage() {
           // Try to get role from localStorage as fallback
           const cachedRole = localStorage.getItem('userRole');
 
-          if (cachedRole === 'faculty' || cachedRole === 'admin') {
+          if (cachedRole) {
             console.log('Using cached role for offline access');
+            setUserRole(cachedRole);
             setIsOffline(true);
             setIsAuthorized(true);
+
+            if (cachedRole === 'student') {
+              setActiveTab('dashboard');
+            }
           } else {
             console.warn('No valid cached role found, redirecting to login');
             router.push('/login');
@@ -487,11 +492,11 @@ const RoomSyncPage = memo(function RoomSyncPage() {
 
     try {
       const createRoomFunction = httpsCallable(functions, 'createRoom');
-      const result = await createRoomFunction({
+      const result = (await createRoomFunction({
         roomName: newRoom.roomName,
         capacity: parseInt(newRoom.capacity),
         roomType: newRoom.roomType
-      });
+      })) as any;
 
       if (result.data.success) {
         setNewRoom({ roomName: "", capacity: "", roomType: "classroom" });
@@ -514,12 +519,12 @@ const RoomSyncPage = memo(function RoomSyncPage() {
 
     try {
       const createSectionFunction = httpsCallable(functions, 'createSection');
-      const result = await createSectionFunction({
+      const result = (await createSectionFunction({
         department: newSection.department,
         sectionName: newSection.sectionName,
         classStrength: parseInt(newSection.classStrength),
         requiredRoomType: newSection.requiredRoomType
-      });
+      })) as any;
 
       if (result.data.success) {
         setNewSection({ department: "", sectionName: "", classStrength: "", requiredRoomType: "classroom" });
@@ -547,11 +552,11 @@ const RoomSyncPage = memo(function RoomSyncPage() {
 
     try {
       const suggestRoomsFunction = httpsCallable(functions, 'suggestRooms');
-      const result = await suggestRoomsFunction({
+      const result = (await suggestRoomsFunction({
         sectionStrength: section.classStrength,
         duration: 60, // Default 1 hour
         roomType: section.requiredRoomType || 'classroom'
-      });
+      })) as any;
 
       if (result.data.success) {
         setSuggestedRooms(result.data.rooms || []);
@@ -574,13 +579,13 @@ const RoomSyncPage = memo(function RoomSyncPage() {
 
     try {
       const allocateRoomFunction = httpsCallable(functions, 'allocateRoom');
-      const result = await allocateRoomFunction({
+      const result = (await allocateRoomFunction({
         roomId,
         sectionId: allocationForm.sectionId,
         date: allocationForm.date,
         startTime: allocationForm.startTime,
         endTime: allocationForm.endTime
-      });
+      })) as any;
 
       if (result.data.success) {
         setAllocationForm({ sectionId: "", date: "", startTime: "", endTime: "" });
@@ -630,8 +635,8 @@ const RoomSyncPage = memo(function RoomSyncPage() {
               </Link>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">
-                Faculty Portal
+              <span className="text-sm text-muted-foreground capitalize">
+                {userRole || 'User'} Portal
               </span>
               <Button
                 variant="outline"
@@ -700,8 +705,8 @@ const RoomSyncPage = memo(function RoomSyncPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">
-              Faculty Portal
+            <span className="text-sm text-muted-foreground capitalize">
+              {userRole || 'User'} Portal
             </span>
             <Button
               variant="outline"
@@ -718,7 +723,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
       <div className="pt-24 pb-12 px-6">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-        <div className="mb-8">
+          <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Building2 className="w-6 h-6 text-primary" />
@@ -728,7 +733,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                 {lastDataRefresh && (
                   <div className="text-xs text-muted-foreground">
                     Last updated: {lastDataRefresh.toLocaleTimeString()}
-          </div>
+                  </div>
                 )}
                 <Button
                   variant="outline"
@@ -740,10 +745,12 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                   <RefreshCw className={`w-4 h-4 ${dataLoading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
-          </div>
-        </div>
+              </div>
+            </div>
             <p className="text-muted-foreground">
-              AI-Powered Room Management & Allocation System
+              {userRole === 'student'
+                ? "View your room allocations and schedules"
+                : "AI-Powered Room Management & Allocation System"}
             </p>
           </div>
 
@@ -760,15 +767,21 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                   </p>
                 </div>
               </div>
-          </div>
+            </div>
           )}
 
           <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="rooms">Room Management</TabsTrigger>
-              <TabsTrigger value="sections">Section Management</TabsTrigger>
-              <TabsTrigger value="allocation">Room Allocation</TabsTrigger>
-              <TabsTrigger value="dashboard">Allocation Dashboard</TabsTrigger>
+            <TabsList className={`grid w-full ${userRole === 'student' ? 'grid-cols-1' : 'grid-cols-4'}`}>
+              {(userRole === 'faculty' || userRole === 'admin') && (
+                <>
+                  <TabsTrigger value="rooms">Room Management</TabsTrigger>
+                  <TabsTrigger value="sections">Section Management</TabsTrigger>
+                  <TabsTrigger value="allocation">Room Allocation</TabsTrigger>
+                </>
+              )}
+              <TabsTrigger value="dashboard">
+                {userRole === 'student' ? 'Current Allocations' : 'Allocation Dashboard'}
+              </TabsTrigger>
             </TabsList>
 
             {/* Room Management Tab */}
@@ -793,10 +806,10 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="roomName"
                           placeholder="e.g., Room 101"
                           value={newRoom.roomName}
-                          onChange={(e) => setNewRoom({...newRoom, roomName: e.target.value})}
+                          onChange={(e) => setNewRoom({ ...newRoom, roomName: e.target.value })}
                           required
                         />
-              </div>
+                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="capacity">Capacity</Label>
@@ -805,15 +818,15 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           type="number"
                           placeholder="e.g., 50"
                           value={newRoom.capacity}
-                          onChange={(e) => setNewRoom({...newRoom, capacity: e.target.value})}
+                          onChange={(e) => setNewRoom({ ...newRoom, capacity: e.target.value })}
                           required
                           min="1"
                         />
-              </div>
+                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="roomType">Room Type</Label>
-                        <Select value={newRoom.roomType} onValueChange={(value: any) => setNewRoom({...newRoom, roomType: value})}>
+                        <Select value={newRoom.roomType} onValueChange={(value: any) => setNewRoom({ ...newRoom, roomType: value })}>
                           <SelectTrigger>
                             <SelectValue placeholder="Select room type" />
                           </SelectTrigger>
@@ -823,14 +836,14 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                             <SelectItem value="seminar">Seminar Hall</SelectItem>
                           </SelectContent>
                         </Select>
-            </div>
+                      </div>
 
                       <Button type="submit" className="w-full" disabled={loading}>
                         {loading ? "Creating..." : "Create Room"}
                       </Button>
                     </form>
                   </CardContent>
-          </Card>
+                </Card>
 
                 {/* Rooms List */}
                 <Card>
@@ -847,21 +860,21 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                       ) : (
                         activeRooms.map((room) => (
                           <div key={room.roomId} className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
+                            <div>
                               <p className="font-medium">{room.roomName}</p>
                               <p className="text-sm text-muted-foreground">
                                 Capacity: {room.capacity} • Type: {room.roomType}
-                </p>
+                              </p>
                             </div>
                             <Badge variant={room.isActive ? "default" : "secondary"}>
                               {room.isActive ? "Active" : "Inactive"}
                             </Badge>
-              </div>
+                          </div>
                         ))
                       )}
-            </div>
+                    </div>
                   </CardContent>
-          </Card>
+                </Card>
               </div>
             </TabsContent>
 
@@ -887,7 +900,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="department"
                           placeholder="e.g., Computer Science"
                           value={newSection.department}
-                          onChange={(e) => setNewSection({...newSection, department: e.target.value})}
+                          onChange={(e) => setNewSection({ ...newSection, department: e.target.value })}
                           required
                         />
                       </div>
@@ -898,10 +911,10 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="sectionName"
                           placeholder="e.g., CS-A"
                           value={newSection.sectionName}
-                          onChange={(e) => setNewSection({...newSection, sectionName: e.target.value})}
+                          onChange={(e) => setNewSection({ ...newSection, sectionName: e.target.value })}
                           required
                         />
-              </div>
+                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="classStrength">Class Strength</Label>
@@ -910,15 +923,15 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           type="number"
                           placeholder="e.g., 45"
                           value={newSection.classStrength}
-                          onChange={(e) => setNewSection({...newSection, classStrength: e.target.value})}
+                          onChange={(e) => setNewSection({ ...newSection, classStrength: e.target.value })}
                           required
                           min="1"
                         />
-            </div>
+                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="requiredRoomType">Required Room Type</Label>
-                        <Select value={newSection.requiredRoomType} onValueChange={(value: any) => setNewSection({...newSection, requiredRoomType: value})}>
+                        <Select value={newSection.requiredRoomType} onValueChange={(value: any) => setNewSection({ ...newSection, requiredRoomType: value })}>
                           <SelectTrigger>
                             <SelectValue placeholder="Select room type" />
                           </SelectTrigger>
@@ -928,7 +941,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                             <SelectItem value="seminar">Seminar Hall</SelectItem>
                           </SelectContent>
                         </Select>
-        </div>
+                      </div>
 
                       <Button type="submit" className="w-full" disabled={loading}>
                         {loading ? "Creating..." : "Create Section"}
@@ -952,15 +965,15 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                       ) : (
                         sections.map((section) => (
                           <div key={section.sectionId} className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
+                            <div>
                               <p className="font-medium">{section.sectionName}</p>
-                  <p className="text-sm text-muted-foreground">
+                              <p className="text-sm text-muted-foreground">
                                 {section.department} • Strength: {section.classStrength}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 Requires: {section.requiredRoomType}
-                  </p>
-                </div>
+                              </p>
+                            </div>
                           </div>
                         ))
                       )}
@@ -987,7 +1000,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="section">Select Section</Label>
-                      <Select value={allocationForm.sectionId} onValueChange={(value) => setAllocationForm({...allocationForm, sectionId: value})}>
+                      <Select value={allocationForm.sectionId} onValueChange={(value) => setAllocationForm({ ...allocationForm, sectionId: value })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Choose a section" />
                         </SelectTrigger>
@@ -999,7 +1012,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                </div>
+                    </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="date">Date</Label>
@@ -1007,10 +1020,10 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                         id="date"
                         type="date"
                         value={allocationForm.date}
-                        onChange={(e) => setAllocationForm({...allocationForm, date: e.target.value})}
+                        onChange={(e) => setAllocationForm({ ...allocationForm, date: e.target.value })}
                         required
                       />
-                </div>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1019,7 +1032,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="startTime"
                           type="time"
                           value={allocationForm.startTime}
-                          onChange={(e) => setAllocationForm({...allocationForm, startTime: e.target.value})}
+                          onChange={(e) => setAllocationForm({ ...allocationForm, startTime: e.target.value })}
                           required
                         />
                       </div>
@@ -1029,7 +1042,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="endTime"
                           type="time"
                           value={allocationForm.endTime}
-                          onChange={(e) => setAllocationForm({...allocationForm, endTime: e.target.value})}
+                          onChange={(e) => setAllocationForm({ ...allocationForm, endTime: e.target.value })}
                           required
                         />
                       </div>
@@ -1071,8 +1084,8 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                               <p className="font-medium">{room.roomName}</p>
                               <p className="text-sm text-muted-foreground">
                                 Capacity: {room.capacity} • Type: {room.roomType}
-                    </p>
-                  </div>
+                              </p>
+                            </div>
                             <Button
                               size="sm"
                               onClick={() => handleAllocateRoom(room.roomId)}
@@ -1126,20 +1139,22 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                               <p className="font-medium">{allocation.startTime} - {allocation.endTime}</p>
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                              <Trash2 className="w-4 h-4" />
-              </Button>
-                          </div>
+                          {(userRole === 'faculty' || userRole === 'admin') && (
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ))
                     )}
                   </div>
                 </CardContent>
-            </Card>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>

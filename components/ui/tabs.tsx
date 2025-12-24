@@ -4,6 +4,7 @@ interface TabsProps {
   value: string
   onValueChange: (value: string) => void
   children?: React.ReactNode
+  className?: string
 }
 
 interface TabsListProps {
@@ -28,10 +29,10 @@ const TabsContext = React.createContext<{
   onValueChange: (value: string) => void
 } | null>(null)
 
-const Tabs: React.FC<TabsProps> = ({ value, onValueChange, children }) => {
+const Tabs: React.FC<TabsProps> = ({ value, onValueChange, children, className = "" }) => {
   return (
     <TabsContext.Provider value={{ value, onValueChange }}>
-      <div className="w-full">{children}</div>
+      <div className={`w-full ${className}`}>{children}</div>
     </TabsContext.Provider>
   )
 }
@@ -52,11 +53,10 @@ const TabsTrigger: React.FC<TabsTriggerProps> = ({ value, children, className = 
 
   return (
     <button
-      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-        isActive
-          ? "bg-background text-foreground shadow-sm"
-          : "hover:bg-background/50"
-      } ${className}`}
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${isActive
+        ? "bg-background text-foreground shadow-sm"
+        : "hover:bg-background/50"
+        } ${className}`}
       onClick={() => context.onValueChange(value)}
     >
       {children}

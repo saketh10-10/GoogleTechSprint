@@ -4,6 +4,11 @@ import {
   doc,
   getDoc,
   getDocs,
+  addDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  increment,
   query,
   where,
   orderBy,
@@ -34,7 +39,9 @@ import {
 // Collection references
 const usersRef = collection(db, 'users');
 const questionsRef = collection(db, 'questions');
+const postsRef = collection(db, 'questions'); // Aliased for legacy code compatibility
 const answersRef = collection(db, 'answers');
+const followsRef = collection(db, 'follows');
 
 // ============================================================================
 // USER MANAGEMENT
@@ -62,7 +69,6 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
   if (!userDoc.exists()) return null;
   const data = userDoc.data();
   return {
-    id: userDoc.id,
     userId: data?.userId || userId,
     name: data?.name || '',
     followersCount: data?.followersCount || 0,
@@ -74,7 +80,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     badges: data?.badges || [],
     joinedAt: data?.joinedAt?.toDate() || new Date(),
     lastActive: data?.lastActive?.toDate() || new Date()
-  } as UserProfile;
+  };
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>): Promise<void> => {
@@ -113,24 +119,26 @@ export const getPost = async (postId: string): Promise<PostWithDetails | null> =
   const postDoc = await getDoc(doc(postsRef, postId));
   if (!postDoc.exists()) return null;
 
-  const post = { id: postDoc.id, ...postDoc.data() } as Post;
+  const data = postDoc.data();
+  const post = { id: postDoc.id, ...data } as Post;
 
   // Get author info
   const authorProfile = await getUserProfile(post.authorId);
-  const author = authorProfile ? { name: authorProfile.name } : { name: 'Unknown User' };
+  const author = authorProfile ? { name: authorProfile.name, avatar: '' } : { name: 'Unknown User', avatar: '' };
 
   // Get answers
-  const answers = await getAnswersForPost(postId);
+  const answers = await getAnswersForQuestion(postId);
 
   // Check if current user upvoted
   const auth = getAuth();
   const currentUser = auth.currentUser;
-  const userUpvoted = currentUser ? await hasUserUpvoted(currentUser.uid, postId, 'post') : false;
+  const userUpvoted = currentUser ? await hasUserUpvoted(currentUser.uid, postId, 'question') : false;
 
   return {
     ...post,
+    authorName: author.name,
     author,
-    answers,
+    answers: answers as AnswerWithDetails[],
     userUpvoted
   };
 };
@@ -162,7 +170,7 @@ export const getQuestions = async (options: {
 
     // Get author info
     const authorProfile = await getUserProfile(question.createdBy);
-    const author = authorProfile ? { name: authorProfile.name, email: authorProfile.userId } : { name: 'Unknown User', email: question.createdBy };
+    const author = authorProfile ? { name: authorProfile.name, avatar: '' } : { name: 'Unknown User', avatar: '' };
 
     // Get answers count (already in question data)
     const answersCount = question.answersCount || 0;
@@ -176,6 +184,7 @@ export const getQuestions = async (options: {
       id: questionDoc.id,
       title: question.title,
       description: question.description,
+      authorName: author.name,
       author,
       authorId: question.createdBy,
       category: question.category || 'General',
@@ -234,14 +243,16 @@ export const getAnswersForQuestion = async (questionId: string): Promise<AnswerW
 
     // Get author info
     const authorProfile = await getUserProfile(answerData.createdBy);
-    const author = authorProfile ? { name: authorProfile.name, email: authorProfile.userId } : { name: 'Unknown User', email: answerData.createdBy };
+    const author = authorProfile ? { name: authorProfile.name, avatar: '' } : { name: 'Unknown User', avatar: '' };
 
     // Check if current user upvoted
     const userUpvoted = currentUser ? await hasUserUpvoted(currentUser.uid, answerDoc.id, 'answer') : false;
 
     answers.push({
       id: answerDoc.id,
+      postId: questionId,
       content: answerData.content,
+      authorName: author.name,
       author,
       authorId: answerData.createdBy,
       upvotes: answerData.upvotesCount || 0,
@@ -254,6 +265,8 @@ export const getAnswersForQuestion = async (questionId: string): Promise<AnswerW
 
   return answers;
 };
+
+export const getAnswersForPost = getAnswersForQuestion; // Alias
 
 export const updateAnswer = async (answerId: string, updates: Partial<Answer>): Promise<void> => {
   await updateDoc(doc(answersRef, answerId), {
@@ -343,8 +356,8 @@ const getFollowRelationship = async (followerId: string, followingId: string): P
 
   const querySnapshot = await getDocs(q);
   if (!querySnapshot.empty) {
-    const doc = querySnapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as Follow;
+    const docSnap = querySnapshot.docs[0];
+    return { id: docSnap.id, ...docSnap.data() } as Follow;
   }
   return null;
 };
@@ -352,13 +365,13 @@ const getFollowRelationship = async (followerId: string, followingId: string): P
 export const getFollowers = async (userId: string): Promise<string[]> => {
   const q = query(followsRef, where('followingId', '==', userId));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => doc.data().followerId);
+  return querySnapshot.docs.map(docSnap => (docSnap.data() as any).followerId);
 };
 
 export const getFollowing = async (userId: string): Promise<string[]> => {
   const q = query(followsRef, where('followerId', '==', userId));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => doc.data().followingId);
+  return querySnapshot.docs.map(docSnap => (docSnap.data() as any).followingId);
 };
 
 // ============================================================================
@@ -366,24 +379,61 @@ export const getFollowing = async (userId: string): Promise<string[]> => {
 // ============================================================================
 
 export const generateLeaderboard = async (): Promise<{ success: boolean; leaderboard?: LeaderboardEntry[]; message?: string }> => {
-  const generateLeaderboardFunction = httpsCallable(functions, 'generateLeaderboard');
-  const result = await generateLeaderboardFunction({});
-  return result.data as any;
+  try {
+    const generateLeaderboardFunction = httpsCallable(functions, 'generateLeaderboard');
+    const result = await generateLeaderboardFunction({});
+    const data = result.data as any;
+
+    // Transform backend fields to frontend types if necessary
+    const leaderboard = (data.leaderboard || []).map((user: any) => ({
+      userId: user.userId,
+      name: user.name,
+      totalUpvotesReceived: user.totalUpvotes || 0,
+      postsCount: user.questionsPosted || 0,
+      answersCount: user.answersPosted || 0,
+      reputation: user.score || 0,
+      rank: user.rank
+    }));
+
+    return { success: true, leaderboard };
+  } catch (error: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Leaderboard generation failed. Returning mock data.', error.message);
+      return {
+        success: true,
+        leaderboard: [
+          { userId: 'u1', name: 'Arjun Reddy', totalUpvotesReceived: 125, answersCount: 42, postsCount: 12, reputation: 125042, rank: 1 },
+          { userId: 'u2', name: 'Priya Sharma', totalUpvotesReceived: 98, answersCount: 35, postsCount: 8, reputation: 98035, rank: 2 },
+          { userId: 'u3', name: 'Siddharth Malhotra', totalUpvotesReceived: 85, answersCount: 28, postsCount: 15, reputation: 85028, rank: 3 },
+          { userId: 'u4', name: 'Ananya Iyer', totalUpvotesReceived: 72, answersCount: 22, postsCount: 5, reputation: 72022, rank: 4 },
+          { userId: 'u5', name: 'Vikram Singh', totalUpvotesReceived: 65, answersCount: 18, postsCount: 10, reputation: 65018, rank: 5 }
+        ],
+        message: "Development Mock Data"
+      };
+    }
+    throw error;
+  }
 };
 
 export const getLeaderboard = async (): Promise<LeaderboardEntry[]> => {
-  // First try to get from the stored leaderboard
   try {
     const leaderboardDoc = await getDoc(doc(db, 'leaderboard/current'));
     if (leaderboardDoc.exists()) {
       const data = leaderboardDoc.data();
-      return data.users || [];
+      return (data.users || []).map((user: any) => ({
+        userId: user.userId,
+        name: user.name,
+        totalUpvotesReceived: user.totalUpvotes || 0,
+        postsCount: user.questionsPosted || 0,
+        answersCount: user.answersPosted || 0,
+        reputation: user.score || 0,
+        rank: user.rank
+      }));
     }
   } catch (error) {
-    console.error('Error fetching stored leaderboard:', error);
+    console.warn('Could not fetch stored leaderboard:', error);
   }
 
-  // If no stored leaderboard, generate a new one
   const result = await generateLeaderboard();
   return result.leaderboard || [];
 };
@@ -393,10 +443,6 @@ export const getLeaderboard = async (): Promise<LeaderboardEntry[]> => {
 // ============================================================================
 
 export const searchQuestions = async (searchTerm: string, category?: string): Promise<PostWithDetails[]> => {
-  // Note: Firestore doesn't support full-text search natively
-  // In production, you'd use Algolia, ElasticSearch, or Firestore's text search extensions
-
-  // For now, we'll do a basic title and tags search
   const allQuestions = await getQuestions({ category });
   return allQuestions.filter(question =>
     question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -410,49 +456,27 @@ export const searchQuestions = async (searchTerm: string, category?: string): Pr
 // ============================================================================
 
 export const subscribeToPost = (postId: string, callback: (post: PostWithDetails) => void) => {
-  return onSnapshot(doc(postsRef, postId), async (doc) => {
-    if (doc.exists()) {
-      const post = { id: doc.id, ...doc.data() } as Post;
-      const postWithDetails = await getPost(postId);
-      if (postWithDetails) {
-        callback(postWithDetails);
-      }
+  return onSnapshot(doc(postsRef, postId), async (docSnap) => {
+    if (docSnap.exists()) {
+      const post = await getPost(postId);
+      if (post) callback(post);
     }
   });
 };
 
 export const subscribeToAnswers = (postId: string, callback: (answers: AnswerWithDetails[]) => void) => {
-  const q = query(answersRef, where('postId', '==', postId), orderBy('createdAt', 'asc'));
+  const q = query(answersRef, where('questionId', '==', postId), orderBy('createdAt', 'asc'));
 
   return onSnapshot(q, async (querySnapshot) => {
-    const answers = [];
-    for (const answerDoc of querySnapshot.docs) {
-      const answer = { id: answerDoc.id, ...answerDoc.data() } as Answer;
-
-      // Get author info
-      const authorProfile = await getUserProfile(answer.authorId);
-      const author = authorProfile ? { name: authorProfile.name } : { name: 'Unknown User' };
-
-      // Check if current user upvoted
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
-      const userUpvoted = currentUser ? await hasUserUpvoted(currentUser.uid, answer.id, 'answer') : false;
-
-      answers.push({
-        ...answer,
-        author,
-        userUpvoted
-      });
-    }
-
+    const answers = await getAnswersForQuestion(postId);
     callback(answers);
   });
 };
 
 export const subscribeToUserProfile = (userId: string, callback: (profile: UserProfile) => void) => {
-  return onSnapshot(doc(usersRef, userId), (doc) => {
-    if (doc.exists()) {
-      const data = doc.data();
+  return onSnapshot(doc(usersRef, userId), (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data();
       const profile: UserProfile = {
         userId: data?.userId || userId,
         name: data?.name || '',
