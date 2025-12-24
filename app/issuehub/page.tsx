@@ -22,7 +22,7 @@ import { PostQuestionDialog } from "@/components/issuehub/post-question-dialog";
 import { QuestionDetailDialog } from "@/components/issuehub/question-detail-dialog";
 import { Leaderboard } from "@/components/issuehub/leaderboard";
 import AuthGuard from "@/components/auth-guard";
-import { getPosts, searchPosts, toggleUpvote, getLeaderboard } from "@/lib/issuehub-service";
+import { getQuestions, searchQuestions, upvoteQuestion, upvoteAnswer, getLeaderboard, createQuestion, createAnswer, getAnswersForQuestion } from "@/lib/issuehub-service";
 import { getAuth } from "firebase/auth";
 import { PostWithDetails, LeaderboardEntry } from "@/lib/types";
 
@@ -151,12 +151,12 @@ export default function IssueHubPage() {
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      const [postsData, leaderboardData] = await Promise.all([
-        getPosts({ limit: 20 }),
-        getLeaderboard(10)
+      const [questionsData, leaderboardData] = await Promise.all([
+        getQuestions({ limit: 20 }),
+        getLeaderboard()
       ]);
 
-      setPosts(postsData);
+      setPosts(questionsData);
       setLeaderboard(leaderboardData);
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -178,9 +178,9 @@ export default function IssueHubPage() {
       let filteredPosts: PostWithDetails[];
 
       if (searchQuery.trim()) {
-        filteredPosts = await searchPosts(searchQuery.trim(), selectedCategory === "All" ? undefined : selectedCategory);
+        filteredPosts = await searchQuestions(searchQuery.trim(), selectedCategory === "All" ? undefined : selectedCategory);
       } else {
-        filteredPosts = await getPosts({
+        filteredPosts = await getQuestions({
           category: selectedCategory === "All" ? undefined : selectedCategory,
           limit: 20
         });
@@ -194,7 +194,7 @@ export default function IssueHubPage() {
     }
   };
 
-  const handleUpvote = async (postId: string) => {
+  const handleUpvote = async (targetId: string, targetType: 'question' | 'answer') => {
     const auth = getAuth();
     const currentUser = auth.currentUser;
 
@@ -204,8 +204,9 @@ export default function IssueHubPage() {
     }
 
     try {
+      // Optimistic update
       const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
+        if (post.id === targetId) {
           return {
             ...post,
             upvotes: post.userUpvoted ? post.upvotes - 1 : post.upvotes + 1,
@@ -216,18 +217,84 @@ export default function IssueHubPage() {
       });
       setPosts(updatedPosts);
 
-      // Actually toggle the upvote in Firebase
-      await toggleUpvote(currentUser.uid, postId, 'post');
-    } catch (error) {
-      console.error('Error toggling upvote:', error);
+      // Call the appropriate upvote function
+      if (targetType === 'question') {
+        await upvoteQuestion(targetId);
+      } else {
+        await upvoteAnswer(targetId);
+      }
+    } catch (error: any) {
+      console.error('Error upvoting:', error);
       // Revert the optimistic update on error
       handleSearchAndFilter();
+
+      // Show error message
+      if (error.message?.includes('already upvoted')) {
+        alert('You have already upvoted this item.');
+      } else {
+        alert('Failed to upvote. Please try again.');
+      }
     }
   };
 
   const handlePostCreated = () => {
-    // Reload posts to show the new post
+    // Reload questions to show the new question
     loadInitialData();
+  };
+
+  const handleQuestionSubmit = async (questionData: { title: string; description: string; tags: string[] }) => {
+    try {
+      const result = await createQuestion(questionData);
+
+      if (result.success) {
+        if (result.question) {
+          // Question created successfully
+          handlePostCreated();
+          return { success: true };
+        }
+      } else if (result.similarQuestions) {
+        // Show similar questions for user to decide
+        return {
+          success: false,
+          similarQuestions: result.similarQuestions,
+          message: result.message
+        };
+      } else {
+        // Other error
+        return { success: false, message: result.message || 'Failed to create question' };
+      }
+    } catch (error) {
+      console.error('Error creating question:', error);
+      return { success: false, message: 'Failed to create question. Please try again.' };
+    }
+  };
+
+  const handleAnswerSubmit = async (questionId: string, content: string) => {
+    try {
+      const result = await createAnswer(questionId, content);
+
+      if (result.success) {
+        // Answer created successfully - refresh the question detail
+        if (selectedQuestion) {
+          // Refresh the current question's answers
+          const updatedPost = posts.find(p => p.id === selectedQuestion);
+          if (updatedPost) {
+            const answers = await getAnswersForQuestion(selectedQuestion);
+            setPosts(prev => prev.map(p =>
+              p.id === selectedQuestion
+                ? { ...p, answers, answersCount: answers.length }
+                : p
+            ));
+          }
+        }
+        return { success: true };
+      } else {
+        return { success: false, message: result.message || 'Failed to post answer' };
+      }
+    } catch (error) {
+      console.error('Error posting answer:', error);
+      return { success: false, message: 'Failed to post answer. Please try again.' };
+    }
   };
 
   // Get trending posts (posts with high upvotes or recent activity)
@@ -241,7 +308,7 @@ export default function IssueHubPage() {
 
   if (loading) {
     return (
-      <AuthGuard>
+      <AuthGuard allowedRoles={['student']} requireAuth={true} requireRole={true}>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
@@ -253,7 +320,7 @@ export default function IssueHubPage() {
   }
 
   return (
-    <AuthGuard>
+    <AuthGuard allowedRoles={['student']} requireAuth={true} requireRole={true}>
       <div className="min-h-screen bg-background transition-colors duration-300">
       {/* Navigation */}
       <nav className="border-b border-border backdrop-blur-sm bg-background/80 transition-colors duration-300">
@@ -552,7 +619,7 @@ export default function IssueHubPage() {
       <PostQuestionDialog
         open={showPostDialog}
         onOpenChange={setShowPostDialog}
-        onPost={handlePostCreated}
+        onPost={handleQuestionSubmit}
       />
 
       {/* Question Detail Dialog */}

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { ThumbsUp, MessageCircle, Clock, CheckCircle, Send, Loader2 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { PostWithDetails, AnswerWithDetails } from "@/lib/types"
-import { createAnswer, toggleUpvote } from "@/lib/issuehub-service"
+import { createAnswer, upvoteAnswer } from "@/lib/issuehub-service"
 import { getAuth } from "firebase/auth"
 
 interface QuestionDetailDialogProps {
@@ -47,16 +47,15 @@ export function QuestionDetailDialog({ question, open, onOpenChange }: QuestionD
 
     setIsSubmitting(true);
     try {
-      await createAnswer({
-        postId: question.id,
-        content: newAnswer.trim(),
-        authorId: user.uid,
-        authorName: user.displayName || user.email?.split('@')[0] || 'Anonymous'
-      });
+      const result = await createAnswer(question.id, newAnswer.trim());
 
-      setNewAnswer("");
-      alert("Answer posted successfully!");
-      // In a real app, you'd refresh the answers or use real-time updates
+      if (result.success) {
+        setNewAnswer("");
+        alert("Answer posted successfully!");
+        // The parent component will refresh the answers
+      } else {
+        alert(result.message || "Failed to post answer.");
+      }
     } catch (error) {
       console.error('Error posting answer:', error);
       alert("Failed to post answer. Please try again.");
@@ -74,24 +73,31 @@ export function QuestionDetailDialog({ question, open, onOpenChange }: QuestionD
     }
 
     try {
-      const newUpvotedState = await toggleUpvote(user.uid, answerId, 'answer');
+      const result = await upvoteAnswer(answerId);
 
-      // Update local state optimistically
-      setAnswers(prevAnswers =>
-        prevAnswers.map(answer =>
-          answer.id === answerId
-            ? {
-                ...answer,
-                upvotes: newUpvotedState ? answer.upvotes + 1 : answer.upvotes - 1,
-                userUpvoted: newUpvotedState
-              }
-            : answer
-        )
-      );
-    } catch (error) {
-      console.error('Error toggling upvote:', error);
-      // Reload answers on error
-      setAnswers(question.answers || []);
+      if (result.success) {
+        // Update local state optimistically
+        setAnswers(prevAnswers =>
+          prevAnswers.map(answer =>
+            answer.id === answerId
+              ? {
+                  ...answer,
+                  upvotes: currentUpvoted ? answer.upvotes - 1 : answer.upvotes + 1,
+                  userUpvoted: !currentUpvoted
+                }
+              : answer
+          )
+        );
+      } else {
+        alert(result.message || "Failed to upvote.");
+      }
+    } catch (error: any) {
+      console.error('Error upvoting answer:', error);
+      if (error.message?.includes('already upvoted')) {
+        alert('You have already upvoted this answer.');
+      } else {
+        alert('Failed to upvote. Please try again.');
+      }
     }
   };
 

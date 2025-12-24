@@ -188,7 +188,115 @@ service cloud.firestore {
       // No updates or deletes (suggestions are temporary)
       allow update, delete: if false;
     }
-    
+
+    // ============================================
+    // ISSUEHUB SYSTEM - QUESTIONS & ANSWERS
+    // ============================================
+    match /questions/{questionId} {
+      // Helper: Check if user is authenticated student
+      function isAuthenticatedStudent() {
+        return isAuthenticated() &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+      }
+
+      // Students can read all questions
+      allow read: if isAuthenticatedStudent();
+
+      // Only backend can create questions (via createQuestion Cloud Function)
+      // This ensures validation and duplicate detection
+      allow create: if false;
+
+      // Students can update their own questions (limited fields only)
+      allow update: if isAuthenticatedStudent() &&
+                   resource.data.createdBy == request.auth.uid &&
+                   request.resource.data.diff(resource.data).affectedKeys()
+                     .hasOnly(['title', 'description', 'tags']);
+
+      // Students can delete their own questions
+      allow delete: if isAuthenticatedStudent() &&
+                   resource.data.createdBy == request.auth.uid;
+    }
+
+    // ============================================
+    // ANSWERS COLLECTION
+    // ============================================
+    match /answers/{answerId} {
+      // Helper: Check if user is authenticated student
+      function isAuthenticatedStudent() {
+        return isAuthenticated() &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+      }
+
+      // Students can read all answers
+      allow read: if isAuthenticatedStudent();
+
+      // Only backend can create answers (via postAnswer Cloud Function)
+      // This ensures proper question counter updates
+      allow create: if false;
+
+      // Students can update their own answers
+      allow update: if isAuthenticatedStudent() &&
+                   resource.data.createdBy == request.auth.uid;
+
+      // Students can delete their own answers
+      allow delete: if isAuthenticatedStudent() &&
+                   resource.data.createdBy == request.auth.uid;
+    }
+
+    // ============================================
+    // UPVOTES COLLECTIONS (Prevent duplicates)
+    // ============================================
+    match /questionUpvotes/{upvoteId} {
+      // Only backend can create upvote records (via upvoteQuestion Cloud Function)
+      allow create: if false;
+      allow read, update, delete: if false; // No client access
+    }
+
+    match /answerUpvotes/{upvoteId} {
+      // Only backend can create upvote records (via upvoteAnswer Cloud Function)
+      allow create: if false;
+      allow read, update, delete: if false; // No client access
+    }
+
+    // ============================================
+    // LEADERBOARD COLLECTION
+    // ============================================
+    match /leaderboard/{documentId} {
+      // Anyone can read leaderboard (for display)
+      allow read: if true;
+
+      // Only backend can create/update leaderboard (via generateLeaderboard Cloud Function)
+      allow write: if false;
+    }
+
+    // ============================================
+    // USERS COLLECTION - METRICS PROTECTION
+    // ============================================
+    match /users/{userId} {
+      // Helper: Check if user is admin
+      function isAdmin() {
+        return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+
+      // Users can read their own profile and other users' basic info
+      allow read: if true;
+
+      // Users can update their own profile (excluding protected metrics)
+      allow update: if isOwner(userId) &&
+                   !request.resource.data.diff(resource.data).affectedKeys()
+                     .hasAny(['questionsPosted', 'answersPosted', 'totalUpvotes',
+                             'followersCount', 'followingCount']);
+
+      // Only backend can update metrics (questionsPosted, answersPosted, totalUpvotes)
+      // This prevents cheating and ensures data integrity
+
+      // Only backend can create user profiles
+      allow create: if false;
+
+      // Users can delete their own account (admin can delete any)
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
     // ============================================
     // DENY ALL OTHER COLLECTIONS
     // ============================================

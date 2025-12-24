@@ -1194,6 +1194,590 @@ exports.validateAllocation = functions.https.onCall(async (data, context) => {
 });
 
 // ============================================
+// ISSUEHUB SYSTEM - QUESTION MANAGEMENT
+// ============================================
+
+// CREATE QUESTION FUNCTION
+exports.createQuestion = functions.https.onCall(async (data, context) => {
+  // Check authentication - only students can post questions
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required."
+    );
+  }
+
+  // Check if user is a student
+  const userDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError(
+      "not-found",
+      "User profile not found."
+    );
+  }
+
+  const userData = userDoc.data();
+  if (userData.role !== "student") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only students can post questions."
+    );
+  }
+
+  // Validate input data
+  const { title, description, tags = [] } = data;
+
+  if (!title || typeof title !== "string" || title.trim().length === 0) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Question title is required and must be a non-empty string."
+    );
+  }
+
+  if (!description || typeof description !== "string" || description.trim().length === 0) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Question description is required and must be a non-empty string."
+    );
+  }
+
+  if (title.length > 200) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Question title must be less than 200 characters."
+    );
+  }
+
+  if (description.length > 2000) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Question description must be less than 2000 characters."
+    );
+  }
+
+  // Validate tags
+  if (!Array.isArray(tags) || tags.length > 5) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Tags must be an array with maximum 5 tags."
+    );
+  }
+
+  // Check for duplicate questions using text normalization
+  const normalizedTitle = title.toLowerCase().trim().replace(/[^\w\s]/g, '');
+  const normalizedDesc = description.toLowerCase().trim().replace(/[^\w\s]/g, '');
+
+  try {
+    // Query for potentially similar questions
+    const existingQuestions = await db.collection("questions")
+      .orderBy("createdAt", "desc")
+      .limit(20)
+      .get();
+
+    const similarQuestions = [];
+    existingQuestions.forEach(doc => {
+      const question = doc.data();
+      const existingNormalizedTitle = question.normalizedText?.title?.toLowerCase() || '';
+      const existingNormalizedDesc = question.normalizedText?.description?.toLowerCase() || '';
+
+      // Simple similarity check - can be enhanced with more sophisticated algorithms
+      const titleSimilarity = calculateSimilarity(normalizedTitle, existingNormalizedTitle);
+      const descSimilarity = calculateSimilarity(normalizedDesc, existingNormalizedDesc);
+
+      if (titleSimilarity > 0.8 || descSimilarity > 0.6) {
+        similarQuestions.push({
+          id: doc.id,
+          title: question.title,
+          similarity: Math.max(titleSimilarity, descSimilarity)
+        });
+      }
+    });
+
+    // If very similar questions found, suggest them
+    if (similarQuestions.length > 0) {
+      return {
+        success: false,
+        similarQuestions: similarQuestions.slice(0, 3),
+        message: "Similar questions found. Please review before posting."
+      };
+    }
+
+    // Create question document
+    const questionData = {
+      title: title.trim(),
+      description: description.trim(),
+      normalizedText: {
+        title: normalizedTitle,
+        description: normalizedDesc
+      },
+      createdBy: context.auth.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      upvotesCount: 0,
+      answersCount: 0,
+      tags: tags,
+      category: determineCategory(tags, title, description)
+    };
+
+    const questionRef = await db.collection("questions").add(questionData);
+
+    // Update user metrics
+    await updateUserMetrics(context.auth.uid, 'questionsPosted', 1);
+
+    console.log(`Question created: "${title}" (ID: ${questionRef.id}) by user ${context.auth.uid}`);
+
+    return {
+      success: true,
+      questionId: questionRef.id,
+      message: "Question posted successfully.",
+      question: {
+        id: questionRef.id,
+        ...questionData,
+        createdAt: new Date()
+      }
+    };
+  } catch (error) {
+    console.error("Error creating question:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to create question.",
+      error.message
+    );
+  }
+});
+
+// Helper function to calculate text similarity (simple implementation)
+function calculateSimilarity(text1, text2) {
+  if (!text1 || !text2) return 0;
+
+  const words1 = text1.split(/\s+/);
+  const words2 = text2.split(/\s+/);
+
+  const commonWords = words1.filter(word =>
+    word.length > 3 && words2.includes(word)
+  );
+
+  return commonWords.length / Math.max(words1.length, words2.length);
+}
+
+// Helper function to determine question category based on tags and content
+function determineCategory(tags, title, description) {
+  const content = `${title} ${description}`.toLowerCase();
+
+  if (tags.includes('academics') || content.includes('exam') || content.includes('grade') || content.includes('subject')) {
+    return 'Academics';
+  }
+  if (tags.includes('library') || content.includes('book') || content.includes('research')) {
+    return 'Library';
+  }
+  if (tags.includes('wifi') || tags.includes('internet') || content.includes('network') || content.includes('connection')) {
+    return 'Infrastructure';
+  }
+  if (tags.includes('club') || content.includes('club') || content.includes('society')) {
+    return 'Clubs';
+  }
+  if (tags.includes('bus') || tags.includes('transport') || content.includes('travel')) {
+    return 'Transport';
+  }
+  if (tags.includes('scholarship') || tags.includes('financial') || content.includes('money') || content.includes('fee')) {
+    return 'Financial';
+  }
+
+  return 'General';
+}
+
+// POST ANSWER FUNCTION
+exports.postAnswer = functions.https.onCall(async (data, context) => {
+  // Check authentication - only students can post answers
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required."
+    );
+  }
+
+  // Check if user is a student
+  const userDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError(
+      "not-found",
+      "User profile not found."
+    );
+  }
+
+  const userData = userDoc.data();
+  if (userData.role !== "student") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only students can post answers."
+    );
+  }
+
+  // Validate input data
+  const { questionId, content } = data;
+
+  if (!questionId || typeof questionId !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Question ID is required and must be a string."
+    );
+  }
+
+  if (!content || typeof content !== "string" || content.trim().length === 0) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Answer content is required and must be a non-empty string."
+    );
+  }
+
+  if (content.length > 2000) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Answer content must be less than 2000 characters."
+    );
+  }
+
+  try {
+    // Verify question exists
+    const questionDoc = await db.collection("questions").doc(questionId).get();
+    if (!questionDoc.exists) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Question not found."
+      );
+    }
+
+    // Create answer document
+    const answerData = {
+      questionId: questionId,
+      content: content.trim(),
+      createdBy: context.auth.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      upvotesCount: 0
+    };
+
+    const answerRef = await db.collection("answers").add(answerData);
+
+    // Update question's answer count
+    await db.collection("questions").doc(questionId).update({
+      answersCount: admin.firestore.FieldValue.increment(1)
+    });
+
+    // Update user metrics
+    await updateUserMetrics(context.auth.uid, 'answersPosted', 1);
+
+    console.log(`Answer posted to question ${questionId} (Answer ID: ${answerRef.id}) by user ${context.auth.uid}`);
+
+    return {
+      success: true,
+      answerId: answerRef.id,
+      message: "Answer posted successfully.",
+      answer: {
+        id: answerRef.id,
+        ...answerData,
+        createdAt: new Date()
+      }
+    };
+  } catch (error) {
+    console.error("Error posting answer:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to post answer.",
+      error.message
+    );
+  }
+});
+
+// UPVOTE QUESTION FUNCTION
+exports.upvoteQuestion = functions.https.onCall(async (data, context) => {
+  // Check authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required."
+    );
+  }
+
+  // Check if user is a student
+  const userDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError(
+      "not-found",
+      "User profile not found."
+    );
+  }
+
+  const userData = userDoc.data();
+  if (userData.role !== "student") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only students can upvote."
+    );
+  }
+
+  const { questionId } = data;
+
+  if (!questionId || typeof questionId !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Question ID is required and must be a string."
+    );
+  }
+
+  try {
+    // Check if user already upvoted this question
+    const existingUpvote = await db.collection("questionUpvotes")
+      .where("userId", "==", context.auth.uid)
+      .where("questionId", "==", questionId)
+      .limit(1)
+      .get();
+
+    if (!existingUpvote.empty) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "You have already upvoted this question."
+      );
+    }
+
+    // Verify question exists
+    const questionDoc = await db.collection("questions").doc(questionId).get();
+    if (!questionDoc.exists) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Question not found."
+      );
+    }
+
+    const questionData = questionDoc.data();
+
+    // Create upvote record
+    await db.collection("questionUpvotes").add({
+      userId: context.auth.uid,
+      questionId: questionId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Update question upvotes count
+    await db.collection("questions").doc(questionId).update({
+      upvotesCount: admin.firestore.FieldValue.increment(1)
+    });
+
+    // Update user metrics for both upvoter and question author
+    await updateUserMetrics(context.auth.uid, 'totalUpvotes', 1);
+    if (questionData.createdBy !== context.auth.uid) {
+      await updateUserMetrics(questionData.createdBy, 'totalUpvotes', 1);
+    }
+
+    console.log(`Question ${questionId} upvoted by user ${context.auth.uid}`);
+
+    return {
+      success: true,
+      message: "Question upvoted successfully."
+    };
+  } catch (error) {
+    console.error("Error upvoting question:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to upvote question.",
+      error.message
+    );
+  }
+});
+
+// UPVOTE ANSWER FUNCTION
+exports.upvoteAnswer = functions.https.onCall(async (data, context) => {
+  // Check authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required."
+    );
+  }
+
+  // Check if user is a student
+  const userDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError(
+      "not-found",
+      "User profile not found."
+    );
+  }
+
+  const userData = userDoc.data();
+  if (userData.role !== "student") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only students can upvote."
+    );
+  }
+
+  const { answerId } = data;
+
+  if (!answerId || typeof answerId !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Answer ID is required and must be a string."
+    );
+  }
+
+  try {
+    // Check if user already upvoted this answer
+    const existingUpvote = await db.collection("answerUpvotes")
+      .where("userId", "==", context.auth.uid)
+      .where("answerId", "==", answerId)
+      .limit(1)
+      .get();
+
+    if (!existingUpvote.empty) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "You have already upvoted this answer."
+      );
+    }
+
+    // Verify answer exists
+    const answerDoc = await db.collection("answers").doc(answerId).get();
+    if (!answerDoc.exists) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Answer not found."
+      );
+    }
+
+    const answerData = answerDoc.data();
+
+    // Create upvote record
+    await db.collection("answerUpvotes").add({
+      userId: context.auth.uid,
+      answerId: answerId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Update answer upvotes count
+    await db.collection("answers").doc(answerId).update({
+      upvotesCount: admin.firestore.FieldValue.increment(1)
+    });
+
+    // Update user metrics for both upvoter and answer author
+    await updateUserMetrics(context.auth.uid, 'totalUpvotes', 1);
+    if (answerData.createdBy !== context.auth.uid) {
+      await updateUserMetrics(answerData.createdBy, 'totalUpvotes', 1);
+    }
+
+    console.log(`Answer ${answerId} upvoted by user ${context.auth.uid}`);
+
+    return {
+      success: true,
+      message: "Answer upvoted successfully."
+    };
+  } catch (error) {
+    console.error("Error upvoting answer:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to upvote answer.",
+      error.message
+    );
+  }
+});
+
+// GENERATE LEADERBOARD FUNCTION
+exports.generateLeaderboard = functions.https.onCall(async (data, context) => {
+  // Check authentication - anyone can view leaderboard but only backend should generate
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required."
+    );
+  }
+
+  try {
+    // Get all users with their metrics
+    const usersSnapshot = await db.collection("users")
+      .where("role", "==", "student")
+      .get();
+
+    const leaderboard = [];
+
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+
+      // Calculate score: primary = totalUpvotes, secondary = answersPosted
+      const score = (userData.totalUpvotes || 0) * 1000 + (userData.answersPosted || 0);
+
+      if (score > 0) { // Only include users with activity
+        leaderboard.push({
+          userId: userDoc.id,
+          name: userData.name || userData.email || 'Anonymous',
+          totalUpvotes: userData.totalUpvotes || 0,
+          answersPosted: userData.answersPosted || 0,
+          questionsPosted: userData.questionsPosted || 0,
+          score: score
+        });
+      }
+    }
+
+    // Sort by score (descending)
+    leaderboard.sort((a, b) => b.score - a.score);
+
+    // Add ranks and limit to top 50
+    const topUsers = leaderboard.slice(0, 50).map((user, index) => ({
+      ...user,
+      rank: index + 1
+    }));
+
+    // Store leaderboard snapshot
+    const leaderboardData = {
+      generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      users: topUsers
+    };
+
+    await db.collection("leaderboard").doc("current").set(leaderboardData);
+
+    console.log(`Leaderboard generated with ${topUsers.length} users`);
+
+    return {
+      success: true,
+      leaderboard: topUsers,
+      message: `Leaderboard generated with ${topUsers.length} active contributors.`
+    };
+  } catch (error) {
+    console.error("Error generating leaderboard:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to generate leaderboard.",
+      error.message
+    );
+  }
+});
+
+// Helper function to update user metrics
+async function updateUserMetrics(userId, metric, increment = 1) {
+  try {
+    const userRef = db.collection("users").doc(userId);
+    await userRef.update({
+      [metric]: admin.firestore.FieldValue.increment(increment)
+    });
+  } catch (error) {
+    console.error(`Error updating user ${metric}:`, error);
+    // Don't throw error for metrics updates to avoid breaking main operations
+  }
+}
+
+// ============================================
 // ROOMSYNC SYSTEM - ROOM MANAGEMENT
 // ============================================
 

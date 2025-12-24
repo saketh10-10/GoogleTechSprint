@@ -9,13 +9,13 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { X, Loader2 } from "lucide-react"
-import { createPost } from "@/lib/issuehub-service"
+import { createQuestion } from "@/lib/issuehub-service"
 import { getAuth } from "firebase/auth"
 
 interface PostQuestionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onPost: () => void
+  onPost: (questionData: { title: string; description: string; tags: string[] }) => Promise<{ success: boolean; similarQuestions?: any[]; message?: string }>
 }
 
 const categories = ["Academics", "Infrastructure", "Library", "Clubs", "Transport", "Financial", "Other"]
@@ -27,6 +27,8 @@ export function PostQuestionDialog({ open, onOpenChange, onPost }: PostQuestionD
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [similarQuestions, setSimilarQuestions] = useState<any[]>([])
+  const [showDuplicates, setShowDuplicates] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,31 +45,34 @@ export function PostQuestionDialog({ open, onOpenChange, onPost }: PostQuestionD
     setIsSubmitting(true)
 
     try {
-      await createPost({
+      const result = await onPost({
         title: title.trim(),
         description: content.trim(),
-        authorId: user.uid,
-        authorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
-        category,
-        tags,
-        status: 'open',
-        isTrending: false
+        tags
       })
 
-      alert("Question Posted! Your question has been shared with the community.")
-      console.log('Question posted successfully')
+      if (result.success) {
+        alert("Question Posted! Your question has been shared with the community.")
+        console.log('Question posted successfully')
 
-      onPost()
-      // Reset form
-      setTitle("")
-      setContent("")
-      setCategory("")
-      setTags([])
-      setTagInput("")
-      onOpenChange(false)
+        // Reset form
+        setTitle("")
+        setContent("")
+        setTags([])
+        setTagInput("")
+        setSimilarQuestions([])
+        setShowDuplicates(false)
+        onOpenChange(false)
+      } else if (result.similarQuestions) {
+        // Show similar questions
+        setSimilarQuestions(result.similarQuestions)
+        setShowDuplicates(true)
+      } else {
+        alert(result.message || "Failed to create question.")
+      }
     } catch (error) {
-      console.error('Error posting question:', error)
-      alert("Failed to post question. Please try again.")
+      console.error('Error creating question:', error)
+      alert("Failed to create question. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -199,6 +204,79 @@ export function PostQuestionDialog({ open, onOpenChange, onPost }: PostQuestionD
               </div>
             )}
           </div>
+
+          {/* Duplicate Detection */}
+          {showDuplicates && similarQuestions.length > 0 && (
+            <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-3">
+                Similar questions found
+              </h4>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-3">
+                We found questions that might already answer your query. Please review them before posting:
+              </p>
+              <div className="space-y-2">
+                {similarQuestions.map((question, index) => (
+                  <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded border text-sm">
+                    <p className="font-medium">{question.title}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowDuplicates(false);
+                    setSimilarQuestions([]);
+                  }}
+                >
+                  Edit Question
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={async () => {
+                    setIsSubmitting(true);
+                    try {
+                      const result = await createQuestion({
+                        title: title.trim(),
+                        description: content.trim(),
+                        tags
+                      });
+
+                      if (result.success) {
+                        setTitle("");
+                        setContent("");
+                        setTags([]);
+                        setTagInput("");
+                        setSimilarQuestions([]);
+                        setShowDuplicates(false);
+                        onOpenChange(false);
+                      } else {
+                        alert(result.message || "Failed to create question.");
+                      }
+                    } catch (error) {
+                      console.error("Error creating question:", error);
+                      alert("Failed to create question. Please try again.");
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Posting...
+                    </>
+                  ) : (
+                    "Post Anyway"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">

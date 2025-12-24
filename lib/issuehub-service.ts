@@ -1,28 +1,23 @@
-// IssueHub Firebase Services
+// IssueHub Firebase Services - Updated for Cloud Functions
 import {
   collection,
   doc,
   getDoc,
   getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
   query,
   where,
   orderBy,
   limit,
   startAfter,
   Timestamp,
-  increment,
-  arrayUnion,
-  arrayRemove,
-  writeBatch,
   onSnapshot,
   QueryDocumentSnapshot,
   DocumentData
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from './firebase';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from './firebase';
 import {
   User,
   UserProfile,
@@ -38,10 +33,8 @@ import {
 
 // Collection references
 const usersRef = collection(db, 'users');
-const postsRef = collection(db, 'posts');
+const questionsRef = collection(db, 'questions');
 const answersRef = collection(db, 'answers');
-const upvotesRef = collection(db, 'upvotes');
-const followsRef = collection(db, 'follows');
 
 // ============================================================================
 // USER MANAGEMENT
@@ -103,29 +96,17 @@ export const updateUserStats = async (userId: string, stats: Partial<UserStats>)
 };
 
 // ============================================================================
-// POST MANAGEMENT
+// QUESTION MANAGEMENT
 // ============================================================================
 
-export const createPost = async (postData: Omit<Post, 'id' | 'upvotes' | 'answersCount' | 'views' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const post: Omit<Post, 'id'> = {
-    ...postData,
-    upvotes: 0,
-    answersCount: 0,
-    views: 0,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  const docRef = await addDoc(postsRef, {
-    ...post,
-    createdAt: Timestamp.fromDate(post.createdAt),
-    updatedAt: Timestamp.fromDate(post.updatedAt)
-  });
-
-  // Update user stats
-  await updateUserStats(postData.authorId, { postsCount: 1 });
-
-  return docRef.id;
+export const createQuestion = async (questionData: {
+  title: string;
+  description: string;
+  tags?: string[]
+}): Promise<{ success: boolean; questionId?: string; similarQuestions?: any[]; message?: string; question?: any }> => {
+  const createQuestionFunction = httpsCallable(functions, 'createQuestion');
+  const result = await createQuestionFunction(questionData);
+  return result.data as any;
 };
 
 export const getPost = async (postId: string): Promise<PostWithDetails | null> => {
@@ -154,12 +135,12 @@ export const getPost = async (postId: string): Promise<PostWithDetails | null> =
   };
 };
 
-export const getPosts = async (options: {
+export const getQuestions = async (options: {
   category?: string;
   limit?: number;
   startAfter?: QueryDocumentSnapshot<DocumentData>;
 } = {}): Promise<PostWithDetails[]> => {
-  let q = query(postsRef, orderBy('createdAt', 'desc'));
+  let q = query(questionsRef, orderBy('createdAt', 'desc'));
 
   if (options.category && options.category !== 'All') {
     q = query(q, where('category', '==', options.category));
@@ -174,34 +155,44 @@ export const getPosts = async (options: {
   }
 
   const querySnapshot = await getDocs(q);
-  const posts: PostWithDetails[] = [];
+  const questions: PostWithDetails[] = [];
 
-  for (const postDoc of querySnapshot.docs) {
-    const post = { id: postDoc.id, ...postDoc.data() } as Post;
+  for (const questionDoc of querySnapshot.docs) {
+    const question = questionDoc.data();
 
     // Get author info
-    const authorProfile = await getUserProfile(post.authorId);
-    const author = authorProfile ? { name: authorProfile.name } : { name: 'Unknown User' };
+    const authorProfile = await getUserProfile(question.createdBy);
+    const author = authorProfile ? { name: authorProfile.name, email: authorProfile.userId } : { name: 'Unknown User', email: question.createdBy };
 
-    // Get answers count
-    const answersSnapshot = await getDocs(query(answersRef, where('postId', '==', post.id)));
-    const answersCount = answersSnapshot.size;
+    // Get answers count (already in question data)
+    const answersCount = question.answersCount || 0;
 
     // Check if current user upvoted
     const auth = getAuth();
     const currentUser = auth.currentUser;
-    const userUpvoted = currentUser ? await hasUserUpvoted(currentUser.uid, post.id, 'post') : false;
+    const userUpvoted = currentUser ? await hasUserUpvoted(currentUser.uid, questionDoc.id, 'question') : false;
 
-    posts.push({
-      ...post,
+    questions.push({
+      id: questionDoc.id,
+      title: question.title,
+      description: question.description,
       author,
-      answers: [], // We'll load answers separately for performance
+      authorId: question.createdBy,
+      category: question.category || 'General',
+      tags: question.tags || [],
+      upvotes: question.upvotesCount || 0,
       answersCount,
-      userUpvoted
+      status: answersCount > 0 ? 'answered' : 'open',
+      createdAt: question.createdAt?.toDate() || new Date(),
+      updatedAt: question.createdAt?.toDate() || new Date(),
+      views: 0, // Not tracked in new system
+      answers: [], // We'll load answers separately for performance
+      userUpvoted,
+      isTrending: (question.upvotesCount || 0) > 5 || answersCount > 2
     });
   }
 
-  return posts;
+  return questions;
 };
 
 export const updatePost = async (postId: string, updates: Partial<Post>): Promise<void> => {
@@ -221,35 +212,17 @@ export const incrementPostViews = async (postId: string): Promise<void> => {
 // ANSWER MANAGEMENT
 // ============================================================================
 
-export const createAnswer = async (answerData: Omit<Answer, 'id' | 'upvotes' | 'isAccepted' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const answer: Omit<Answer, 'id'> = {
-    ...answerData,
-    upvotes: 0,
-    isAccepted: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  const docRef = await addDoc(answersRef, {
-    ...answer,
-    createdAt: Timestamp.fromDate(answer.createdAt),
-    updatedAt: Timestamp.fromDate(answer.updatedAt)
+export const createAnswer = async (questionId: string, content: string): Promise<{ success: boolean; answerId?: string; message?: string; answer?: any }> => {
+  const postAnswerFunction = httpsCallable(functions, 'postAnswer');
+  const result = await postAnswerFunction({
+    questionId,
+    content
   });
-
-  // Update post answers count
-  await updateDoc(doc(postsRef, answerData.postId), {
-    answersCount: increment(1),
-    updatedAt: Timestamp.fromDate(new Date())
-  });
-
-  // Update user stats
-  await updateUserStats(answerData.authorId, { answersCount: 1 });
-
-  return docRef.id;
+  return result.data as any;
 };
 
-export const getAnswersForPost = async (postId: string): Promise<AnswerWithDetails[]> => {
-  const q = query(answersRef, where('postId', '==', postId), orderBy('createdAt', 'asc'));
+export const getAnswersForQuestion = async (questionId: string): Promise<AnswerWithDetails[]> => {
+  const q = query(answersRef, where('questionId', '==', questionId), orderBy('createdAt', 'asc'));
   const querySnapshot = await getDocs(q);
 
   const answers: AnswerWithDetails[] = [];
@@ -257,18 +230,24 @@ export const getAnswersForPost = async (postId: string): Promise<AnswerWithDetai
   const currentUser = auth.currentUser;
 
   for (const answerDoc of querySnapshot.docs) {
-    const answer = { id: answerDoc.id, ...answerDoc.data() } as Answer;
+    const answerData = answerDoc.data();
 
     // Get author info
-    const authorProfile = await getUserProfile(answer.authorId);
-    const author = authorProfile ? { name: authorProfile.name } : { name: 'Unknown User' };
+    const authorProfile = await getUserProfile(answerData.createdBy);
+    const author = authorProfile ? { name: authorProfile.name, email: authorProfile.userId } : { name: 'Unknown User', email: answerData.createdBy };
 
     // Check if current user upvoted
-    const userUpvoted = currentUser ? await hasUserUpvoted(currentUser.uid, answer.id, 'answer') : false;
+    const userUpvoted = currentUser ? await hasUserUpvoted(currentUser.uid, answerDoc.id, 'answer') : false;
 
     answers.push({
-      ...answer,
+      id: answerDoc.id,
+      content: answerData.content,
       author,
+      authorId: answerData.createdBy,
+      upvotes: answerData.upvotesCount || 0,
+      isAccepted: false, // Not implemented in this version
+      createdAt: answerData.createdAt?.toDate() || new Date(),
+      updatedAt: answerData.createdAt?.toDate() || new Date(),
       userUpvoted
     });
   }
@@ -287,76 +266,35 @@ export const updateAnswer = async (answerId: string, updates: Partial<Answer>): 
 // UPVOTE SYSTEM
 // ============================================================================
 
-export const toggleUpvote = async (userId: string, targetId: string, targetType: 'post' | 'answer'): Promise<boolean> => {
-  const existingUpvote = await getUserUpvote(userId, targetId, targetType);
-
-  if (existingUpvote) {
-    // Remove upvote
-    await deleteDoc(doc(upvotesRef, existingUpvote.id));
-
-    // Decrement upvotes count
-    const targetRef = targetType === 'post' ? postsRef : answersRef;
-    await updateDoc(doc(targetRef, targetId), {
-      upvotes: increment(-1)
-    });
-
-    // Update user stats if it's an answer
-    if (targetType === 'answer') {
-      const answerDoc = await getDoc(doc(answersRef, targetId));
-      if (answerDoc.exists()) {
-        const answer = answerDoc.data() as Answer;
-        await updateUserStats(answer.authorId, { totalUpvotesReceived: -1 });
-      }
-    }
-
-    return false; // Upvote removed
-  } else {
-    // Add upvote
-    await addDoc(upvotesRef, {
-      userId,
-      targetId,
-      targetType,
-      createdAt: Timestamp.fromDate(new Date())
-    });
-
-    // Increment upvotes count
-    const targetRef = targetType === 'post' ? postsRef : answersRef;
-    await updateDoc(doc(targetRef, targetId), {
-      upvotes: increment(1)
-    });
-
-    // Update user stats if it's an answer
-    if (targetType === 'answer') {
-      const answerDoc = await getDoc(doc(answersRef, targetId));
-      if (answerDoc.exists()) {
-        const answer = answerDoc.data() as Answer;
-        await updateUserStats(answer.authorId, { totalUpvotesReceived: 1 });
-      }
-    }
-
-    return true; // Upvote added
-  }
+export const upvoteQuestion = async (questionId: string): Promise<{ success: boolean; message?: string }> => {
+  const upvoteQuestionFunction = httpsCallable(functions, 'upvoteQuestion');
+  const result = await upvoteQuestionFunction({ questionId });
+  return result.data as any;
 };
 
-export const hasUserUpvoted = async (userId: string, targetId: string, targetType: 'post' | 'answer'): Promise<boolean> => {
-  const upvote = await getUserUpvote(userId, targetId, targetType);
-  return !!upvote;
+export const upvoteAnswer = async (answerId: string): Promise<{ success: boolean; message?: string }> => {
+  const upvoteAnswerFunction = httpsCallable(functions, 'upvoteAnswer');
+  const result = await upvoteAnswerFunction({ answerId });
+  return result.data as any;
 };
 
-const getUserUpvote = async (userId: string, targetId: string, targetType: 'post' | 'answer'): Promise<Upvote | null> => {
-  const q = query(
-    upvotesRef,
-    where('userId', '==', userId),
-    where('targetId', '==', targetId),
-    where('targetType', '==', targetType)
-  );
+export const hasUserUpvoted = async (userId: string, targetId: string, targetType: 'question' | 'answer'): Promise<boolean> => {
+  try {
+    const collectionName = targetType === 'question' ? 'questionUpvotes' : 'answerUpvotes';
+    const upvotesRef = collection(db, collectionName);
 
-  const querySnapshot = await getDocs(q);
-  if (!querySnapshot.empty) {
-    const doc = querySnapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as Upvote;
+    const q = query(
+      upvotesRef,
+      where('userId', '==', userId),
+      where(targetType === 'question' ? 'questionId' : 'answerId', '==', targetId)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('Error checking upvote status:', error);
+    return false;
   }
-  return null;
 };
 
 // ============================================================================
@@ -427,43 +365,43 @@ export const getFollowing = async (userId: string): Promise<string[]> => {
 // LEADERBOARD
 // ============================================================================
 
-export const getLeaderboard = async (limitCount: number = 10): Promise<LeaderboardEntry[]> => {
-  const q = query(usersRef, orderBy('reputation', 'desc'), limit(limitCount));
-  const querySnapshot = await getDocs(q);
+export const generateLeaderboard = async (): Promise<{ success: boolean; leaderboard?: LeaderboardEntry[]; message?: string }> => {
+  const generateLeaderboardFunction = httpsCallable(functions, 'generateLeaderboard');
+  const result = await generateLeaderboardFunction({});
+  return result.data as any;
+};
 
-  const leaderboard: LeaderboardEntry[] = [];
-  let rank = 1;
+export const getLeaderboard = async (): Promise<LeaderboardEntry[]> => {
+  // First try to get from the stored leaderboard
+  try {
+    const leaderboardDoc = await getDoc(doc(db, 'leaderboard/current'));
+    if (leaderboardDoc.exists()) {
+      const data = leaderboardDoc.data();
+      return data.users || [];
+    }
+  } catch (error) {
+    console.error('Error fetching stored leaderboard:', error);
+  }
 
-  querySnapshot.forEach((doc) => {
-    const userData = doc.data() as UserProfile;
-    leaderboard.push({
-      userId: userData.userId,
-      name: userData.name,
-      totalUpvotesReceived: userData.totalUpvotesReceived,
-      postsCount: userData.postsCount,
-      answersCount: userData.answersCount,
-      reputation: userData.reputation,
-      rank: rank++
-    });
-  });
-
-  return leaderboard;
+  // If no stored leaderboard, generate a new one
+  const result = await generateLeaderboard();
+  return result.leaderboard || [];
 };
 
 // ============================================================================
 // SEARCH AND FILTERING
 // ============================================================================
 
-export const searchPosts = async (searchTerm: string, category?: string): Promise<PostWithDetails[]> => {
+export const searchQuestions = async (searchTerm: string, category?: string): Promise<PostWithDetails[]> => {
   // Note: Firestore doesn't support full-text search natively
   // In production, you'd use Algolia, ElasticSearch, or Firestore's text search extensions
 
   // For now, we'll do a basic title and tags search
-  const allPosts = await getPosts({ category });
-  return allPosts.filter(post =>
-    post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    post.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    post.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const allQuestions = await getQuestions({ category });
+  return allQuestions.filter(question =>
+    question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    question.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    question.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 };
 
