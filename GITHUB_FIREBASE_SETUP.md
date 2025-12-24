@@ -123,3 +123,4 @@ npx firebase-tools deploy --only hosting
 
 **Follow these steps and your GitHub repository will be automatically deployed to Firebase Hosting!** 🚀
 
+

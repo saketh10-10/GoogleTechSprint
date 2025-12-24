@@ -5,6 +5,7 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFunctions, Functions } from 'firebase/functions';
 
 // Firebase Demo Configuration for Development
 // This allows the app to run immediately while you set up your Firebase project
@@ -52,6 +53,7 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
+let functions: Functions;
 
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
@@ -61,5 +63,6 @@ if (!getApps().length) {
 
 auth = getAuth(app);
 db = getFirestore(app);
+functions = getFunctions(app);
 
-export { app, auth, db };
+export { app, auth, db, functions };

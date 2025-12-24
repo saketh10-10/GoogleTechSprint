@@ -36,38 +36,33 @@ service cloud.firestore {
     // ============================================
     // QR SESSIONS COLLECTION
     // ============================================
-    match /qr_sessions/{sessionId} {
-      // Students can CREATE only their own QR sessions
-      allow create: if isAuthenticated()
-                    && request.resource.data.userId == request.auth.uid
-                    && request.resource.data.keys().hasAll(['userId', 'eventId', 'nonce', 'createdAt', 'expiresAt', 'used'])
-                    && request.resource.data.used == false
-                    && request.resource.data.createdAt is timestamp
-                    && request.resource.data.expiresAt is timestamp
-                    // Ensure expiry is within 2 minutes
-                    && request.resource.data.expiresAt.toMillis() <= request.resource.data.createdAt.toMillis() + 120000;
-      
-      // Students can READ only their own QR sessions
-      allow read: if isAuthenticated() 
-                  && resource.data.userId == request.auth.uid;
-      
-      // Students CANNOT update or delete QR sessions
-      // Only backend can mark as 'used'
-      allow update: if false; // Backend only
-      allow delete: if false; // Backend only
+    match /qrSessions/{sessionId} {
+      // Client CANNOT write to qrSessions collection
+      // Only Cloud Functions can create QR sessions
+      allow create: if false; // Backend only via Cloud Functions
+
+      // Users can read QR sessions for validation (but Cloud Functions handle the actual validation)
+      allow read: if isAuthenticated();
+
+      // Client CANNOT update or delete QR sessions
+      // Only Cloud Functions can mark as 'used'
+      allow update: if false; // Backend only via Cloud Functions
+      allow delete: if false; // Backend only via Cloud Functions
     }
     
     // ============================================
     // ATTENDANCE COLLECTION
     // ============================================
     match /attendance/{attendanceId} {
-      // Students can READ only their own attendance records
-      allow read: if isAuthenticated() 
+      // Users can READ attendance records (for viewing their own attendance)
+      allow read: if isAuthenticated()
                   && resource.data.userId == request.auth.uid;
-      
-      // Students CANNOT write attendance records
-      // Only backend via Cloud Functions can create attendance
-      allow write: if false; // Backend only via Admin SDK
+
+      // Client CANNOT write to attendance collection
+      // Only Cloud Functions can create attendance records
+      allow create: if false; // Backend only via Cloud Functions
+      allow update: if false; // Backend only via Cloud Functions
+      allow delete: if false; // Backend only via Cloud Functions
     }
     
     // ============================================
@@ -102,32 +97,26 @@ service cloud.firestore {
     match /rooms/{roomId} {
       // Helper: Check if user is faculty or admin
       function isFacultyOrAdmin() {
-        return isAuthenticated() && 
+        return isAuthenticated() &&
                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['faculty', 'admin'];
       }
-      
+
       // Helper: Check if user is admin
       function isAdmin() {
-        return isAuthenticated() && 
+        return isAuthenticated() &&
                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
       }
-      
+
       // Faculty and Admin can READ rooms
       allow read: if isFacultyOrAdmin();
-      
-      // Only Admin can CREATE rooms
-      allow create: if isAdmin()
-                    && request.resource.data.keys().hasAll(['roomName', 'roomNumber', 'capacity', 'roomType', 'availabilityStatus', 'createdAt', 'createdBy'])
-                    && request.resource.data.capacity is int
-                    && request.resource.data.capacity > 0
-                    && request.resource.data.roomType in ['classroom', 'lab', 'seminar hall']
-                    && request.resource.data.availabilityStatus in ['available', 'unavailable'];
-      
-      // Admin can UPDATE rooms, Faculty can update availability only
-      allow update: if isAdmin()
-                    || (isFacultyOrAdmin() && 
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availabilityStatus', 'updatedAt', 'updatedBy']));
-      
+
+      // Only backend can CREATE rooms (via Cloud Function)
+      // This ensures validation and prevents duplicate room names
+      allow create: if false;
+
+      // Only backend can UPDATE rooms
+      allow update: if false;
+
       // Only Admin can DELETE rooms
       allow delete: if isAdmin();
     }
@@ -138,22 +127,20 @@ service cloud.firestore {
     match /sections/{sectionId} {
       // Helper: Check if user is faculty or admin
       function isFacultyOrAdmin() {
-        return isAuthenticated() && 
+        return isAuthenticated() &&
                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['faculty', 'admin'];
       }
-      
+
       // Faculty and Admin can READ sections
       allow read: if isFacultyOrAdmin();
-      
-      // Faculty and Admin can CREATE sections
-      allow create: if isFacultyOrAdmin()
-                    && request.resource.data.keys().hasAll(['sectionName', 'department', 'classStrength', 'createdAt', 'createdBy'])
-                    && request.resource.data.classStrength is int
-                    && request.resource.data.classStrength > 0;
-      
+
+      // Only backend can CREATE sections (via Cloud Function)
+      // This ensures validation and prevents duplicate sections
+      allow create: if false;
+
       // Faculty and Admin can UPDATE sections
       allow update: if isFacultyOrAdmin();
-      
+
       // Faculty and Admin can DELETE sections
       allow delete: if isFacultyOrAdmin();
     }
@@ -164,20 +151,20 @@ service cloud.firestore {
     match /allocations/{allocationId} {
       // Helper: Check if user is faculty or admin
       function isFacultyOrAdmin() {
-        return isAuthenticated() && 
+        return isAuthenticated() &&
                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['faculty', 'admin'];
       }
-      
+
       // Faculty and Admin can READ allocations
       allow read: if isFacultyOrAdmin();
-      
+
       // Only backend can CREATE allocations (via Cloud Function)
-      // This ensures validation logic is enforced
+      // This ensures conflict detection and validation logic is enforced
       allow create: if false;
-      
+
       // Only backend can UPDATE allocations
       allow update: if false;
-      
+
       // Faculty and Admin can DELETE allocations (cancellation)
       allow delete: if isFacultyOrAdmin();
     }

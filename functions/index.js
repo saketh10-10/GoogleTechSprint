@@ -25,9 +25,180 @@ const AUTHORITY_EMAIL =
   "authority@klh.edu.in";
 
 // ============================================
-// CLOUD FUNCTION: VALIDATE QR CODE & MARK ATTENDANCE
+// CLOUD FUNCTION: GET TODAY'S EVENTS
 // ============================================
-exports.validateQrScan = functions.https.onCall(async (data, context) => {
+exports.getTodaysEvents = functions.https.onCall(async (data, context) => {
+  try {
+    // Optional authentication - allow unauthenticated reads for events
+    // if (context.auth) { ... } // Uncomment if authentication is required
+
+    // Get today's date
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+    // Query events for today
+    const eventsQuery = await db
+      .collection("events")
+      .where("date", ">=", admin.firestore.Timestamp.fromDate(startOfDay))
+      .where("date", "<", admin.firestore.Timestamp.fromDate(endOfDay))
+      .orderBy("date")
+      .orderBy("startTime")
+      .get();
+
+    const events = [];
+    eventsQuery.forEach((doc) => {
+      const eventData = doc.data();
+      events.push({
+        eventId: doc.id,
+        title: eventData.title,
+        date: eventData.date.toDate().toISOString().split('T')[0], // YYYY-MM-DD format
+        startTime: eventData.startTime,
+        endTime: eventData.endTime,
+        venue: eventData.venue,
+        description: eventData.description || "",
+        // Add any other fields as needed
+      });
+    });
+
+    return {
+      success: true,
+      events: events,
+      totalEvents: events.length,
+      date: today.toISOString().split('T')[0]
+    };
+  } catch (error) {
+    console.error("Get Today's Events Error:", error);
+
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to fetch today's events.",
+      error.message
+    );
+  }
+});
+
+// ============================================
+// CLOUD FUNCTION: GENERATE ATTENDANCE QR
+// ============================================
+exports.generateAttendanceQR = functions.https.onCall(async (data, context) => {
+  try {
+    // SECURITY CHECK: Ensure user is authenticated
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated to generate QR codes."
+      );
+    }
+
+    const userId = context.auth.uid;
+    const { eventId } = data;
+
+    // VALIDATION: Check required fields
+    if (!eventId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Event ID is required."
+      );
+    }
+
+    // VALIDATION: Check if event exists and is today
+    const eventDoc = await db.collection("events").doc(eventId).get();
+    if (!eventDoc.exists) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Event not found. Cannot generate QR for non-existent event."
+      );
+    }
+
+    const event = eventDoc.data();
+    const eventDate = event.date.toDate();
+    const today = new Date();
+
+    // Check if event is today
+    if (
+      eventDate.getFullYear() !== today.getFullYear() ||
+      eventDate.getMonth() !== today.getMonth() ||
+      eventDate.getDate() !== today.getDate()
+    ) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Event is not scheduled for today. Cannot generate QR."
+      );
+    }
+
+    // VALIDATION: Check if attendance already exists (prevent duplicate QR generation)
+    const existingAttendanceQuery = await db
+      .collection("attendance")
+      .where("userId", "==", userId)
+      .where("eventId", "==", eventId)
+      .limit(1)
+      .get();
+
+    if (!existingAttendanceQuery.empty) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "Attendance already marked for this event. Cannot generate QR."
+      );
+    }
+
+    // Generate unique QR ID and nonce
+    const crypto = require("crypto");
+    const qrId = crypto.randomBytes(16).toString("hex");
+    const nonce = crypto.randomBytes(16).toString("hex");
+
+    const now = admin.firestore.Timestamp.now();
+    const expiresAt = admin.firestore.Timestamp.fromMillis(
+      now.toMillis() + QR_EXPIRY_MS
+    );
+
+    // Create QR session document
+    const qrSessionData = {
+      qrId: qrId,
+      userId: userId,
+      eventId: eventId,
+      expiresAt: expiresAt,
+      used: false,
+      createdAt: now,
+      nonce: nonce
+    };
+
+    const qrSessionRef = db.collection("qrSessions").doc();
+    await qrSessionRef.set(qrSessionData);
+
+    // Create QR payload (what gets encoded in the QR code)
+    const qrPayload = `${qrId}:${nonce}`;
+
+    return {
+      success: true,
+      qrPayload: qrPayload,
+      qrId: qrId,
+      expiresAt: expiresAt.toMillis(),
+      expiresInSeconds: QR_EXPIRY_MINUTES * 60,
+      eventTitle: event.title,
+      eventVenue: event.venue
+    };
+  } catch (error) {
+    console.error("Generate Attendance QR Error:", error);
+
+    // Re-throw HttpsError to preserve error details
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    // Wrap unexpected errors
+    throw new functions.https.HttpsError(
+      "internal",
+      "An unexpected error occurred during QR generation.",
+      error.message
+    );
+  }
+});
+
+// ============================================
+// CLOUD FUNCTION: VALIDATE ATTENDANCE QR
+// ============================================
+exports.validateAttendanceQR = functions.https.onCall(async (data, context) => {
   try {
     // SECURITY CHECK 1: Ensure user is authenticated
     if (!context.auth) {
@@ -40,10 +211,10 @@ exports.validateQrScan = functions.https.onCall(async (data, context) => {
     const scannerUserId = context.auth.uid;
 
     // Extract QR payload from request
-    const { userId, eventId, nonce, timestamp } = data;
+    const { qrId, eventId, nonce, timestamp } = data;
 
     // VALIDATION 1: Check all required fields are present
-    if (!userId || !eventId || !nonce || !timestamp) {
+    if (!qrId || !eventId || !nonce || !timestamp) {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "QR code payload is incomplete. Missing required fields."
@@ -52,8 +223,8 @@ exports.validateQrScan = functions.https.onCall(async (data, context) => {
 
     // VALIDATION 2: Verify the QR session exists in Firestore
     const qrSessionQuery = await db
-      .collection("qr_sessions")
-      .where("userId", "==", userId)
+      .collection("qrSessions")
+      .where("qrId", "==", qrId)
       .where("eventId", "==", eventId)
       .where("nonce", "==", nonce)
       .limit(1)
@@ -68,6 +239,7 @@ exports.validateQrScan = functions.https.onCall(async (data, context) => {
 
     const qrSessionDoc = qrSessionQuery.docs[0];
     const qrSession = qrSessionDoc.data();
+    const actualUserId = qrSession.userId; // The actual user who generated the QR
 
     // VALIDATION 3: Check if QR has already been used (replay attack prevention)
     if (qrSession.used === true) {
@@ -96,11 +268,11 @@ exports.validateQrScan = functions.https.onCall(async (data, context) => {
       );
     }
 
-    // VALIDATION 6: Verify user-event binding
-    if (qrSession.userId !== userId || qrSession.eventId !== eventId) {
+    // VALIDATION 6: Verify QR session data integrity
+    if (qrSession.eventId !== eventId) {
       throw new functions.https.HttpsError(
         "permission-denied",
-        "QR code user-event binding mismatch. Security violation detected."
+        "QR code event binding mismatch. Security violation detected."
       );
     }
 
@@ -132,7 +304,7 @@ exports.validateQrScan = functions.https.onCall(async (data, context) => {
     // VALIDATION 8: Check if attendance already exists (prevent duplicates)
     const existingAttendanceQuery = await db
       .collection("attendance")
-      .where("userId", "==", userId)
+      .where("userId", "==", actualUserId)
       .where("eventId", "==", eventId)
       .limit(1)
       .get();
@@ -160,11 +332,12 @@ exports.validateQrScan = functions.https.onCall(async (data, context) => {
       // Create attendance record
       const attendanceRef = db.collection("attendance").doc();
       const attendanceData = {
-        userId: userId,
+        attendanceId: attendanceRef.id,
+        userId: actualUserId,
         eventId: eventId,
         eventTitle: event.title || "Unknown Event",
         eventVenue: event.venue || "Unknown Venue",
-        scanTimestamp: FieldValue.serverTimestamp(),
+        scanTime: FieldValue.serverTimestamp(),
         scannedBy: scannerUserId,
         deviceMetadata: {
           userAgent: context.rawRequest?.headers?.["user-agent"] || "Unknown",
@@ -186,10 +359,10 @@ exports.validateQrScan = functions.https.onCall(async (data, context) => {
     // ============================================
 
     // Get user details
-    let userName = userId;
+    let userName = actualUserId;
     try {
-      const userRecord = await admin.auth().getUser(userId);
-      userName = userRecord.displayName || userRecord.email || userId;
+      const userRecord = await admin.auth().getUser(actualUserId);
+      userName = userRecord.displayName || userRecord.email || actualUserId;
     } catch (error) {
       console.error("Error fetching user details:", error);
     }
@@ -443,7 +616,7 @@ exports.cleanupExpiredQrSessions = functions.pubsub
 
     // Find expired sessions
     const expiredSessions = await db
-      .collection("qr_sessions")
+      .collection("qrSessions")
       .where("expiresAt", "<=", now)
       .limit(500)
       .get();
@@ -1015,6 +1188,474 @@ exports.validateAllocation = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError(
       "internal",
       "Validation failed.",
+      error.message
+    );
+  }
+});
+
+// ============================================
+// ROOMSYNC SYSTEM - ROOM MANAGEMENT
+// ============================================
+
+// CREATE ROOM FUNCTION
+exports.createRoom = functions.https.onCall(async (data, context) => {
+  // Check authentication and authorization
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required."
+    );
+  }
+
+  // Check if user is faculty or admin
+  const userDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError(
+      "not-found",
+      "User profile not found."
+    );
+  }
+
+  const userData = userDoc.data();
+  if (userData.role !== "faculty" && userData.role !== "admin") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only faculty and admin users can create rooms."
+    );
+  }
+
+  // Validate input data
+  const { roomName, capacity, roomType } = data;
+
+  if (!roomName || typeof roomName !== "string" || roomName.trim().length === 0) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Room name is required and must be a non-empty string."
+    );
+  }
+
+  if (!capacity || typeof capacity !== "number" || capacity <= 0 || capacity > 500) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Capacity must be a number between 1 and 500."
+    );
+  }
+
+  const validRoomTypes = ["classroom", "lab", "seminar"];
+  if (!roomType || !validRoomTypes.includes(roomType)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Room type must be one of: classroom, lab, seminar."
+    );
+  }
+
+  try {
+    // Check if room name already exists
+    const existingRoom = await db
+      .collection("rooms")
+      .where("roomName", "==", roomName.trim())
+      .get();
+
+    if (!existingRoom.empty) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "A room with this name already exists."
+      );
+    }
+
+    // Create room document
+    const roomData = {
+      roomName: roomName.trim(),
+      capacity: capacity,
+      roomType: roomType,
+      isActive: true,
+      createdBy: context.auth.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const roomRef = await db.collection("rooms").add(roomData);
+
+    console.log(`Room created: ${roomName} (ID: ${roomRef.id})`);
+
+    return {
+      success: true,
+      roomId: roomRef.id,
+      message: "Room created successfully.",
+    };
+  } catch (error) {
+    console.error("Error creating room:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to create room.",
+      error.message
+    );
+  }
+});
+
+// CREATE SECTION FUNCTION
+exports.createSection = functions.https.onCall(async (data, context) => {
+  // Check authentication and authorization
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required."
+    );
+  }
+
+  // Check if user is faculty or admin
+  const userDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError(
+      "not-found",
+      "User profile not found."
+    );
+  }
+
+  const userData = userDoc.data();
+  if (userData.role !== "faculty" && userData.role !== "admin") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only faculty and admin users can create sections."
+    );
+  }
+
+  // Validate input data
+  const { department, sectionName, classStrength, requiredRoomType } = data;
+
+  if (!department || typeof department !== "string" || department.trim().length === 0) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Department is required and must be a non-empty string."
+    );
+  }
+
+  if (!sectionName || typeof sectionName !== "string" || sectionName.trim().length === 0) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Section name is required and must be a non-empty string."
+    );
+  }
+
+  if (!classStrength || typeof classStrength !== "number" || classStrength <= 0 || classStrength > 200) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Class strength must be a number between 1 and 200."
+    );
+  }
+
+  const validRoomTypes = ["classroom", "lab", "seminar"];
+  if (requiredRoomType && !validRoomTypes.includes(requiredRoomType)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Required room type must be one of: classroom, lab, seminar."
+    );
+  }
+
+  try {
+    // Check if section name already exists
+    const existingSection = await db
+      .collection("sections")
+      .where("sectionName", "==", sectionName.trim())
+      .where("department", "==", department.trim())
+      .get();
+
+    if (!existingSection.empty) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "A section with this name already exists in this department."
+      );
+    }
+
+    // Create section document
+    const sectionData = {
+      department: department.trim(),
+      sectionName: sectionName.trim(),
+      classStrength: classStrength,
+      requiredRoomType: requiredRoomType || "classroom",
+      createdBy: context.auth.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const sectionRef = await db.collection("sections").add(sectionData);
+
+    console.log(`Section created: ${sectionName} (ID: ${sectionRef.id})`);
+
+    return {
+      success: true,
+      sectionId: sectionRef.id,
+      message: "Section created successfully.",
+    };
+  } catch (error) {
+    console.error("Error creating section:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to create section.",
+      error.message
+    );
+  }
+});
+
+// ALLOCATE ROOM FUNCTION
+exports.allocateRoom = functions.https.onCall(async (data, context) => {
+  // Check authentication and authorization
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required."
+    );
+  }
+
+  // Check if user is faculty or admin
+  const userDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError(
+      "not-found",
+      "User profile not found."
+    );
+  }
+
+  const userData = userDoc.data();
+  if (userData.role !== "faculty" && userData.role !== "admin") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only faculty and admin users can allocate rooms."
+    );
+  }
+
+  // Validate input data
+  const { roomId, sectionId, date, startTime, endTime } = data;
+
+  if (!roomId || !sectionId || !date || !startTime || !endTime) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "All allocation fields are required."
+    );
+  }
+
+  try {
+    // Get room and section data
+    const [roomDoc, sectionDoc] = await Promise.all([
+      db.collection("rooms").doc(roomId).get(),
+      db.collection("sections").doc(sectionId).get(),
+    ]);
+
+    if (!roomDoc.exists) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Room not found."
+      );
+    }
+
+    if (!sectionDoc.exists) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Section not found."
+      );
+    }
+
+    const room = roomDoc.data();
+    const section = sectionDoc.data();
+
+    // Validate capacity
+    if (room.capacity < section.classStrength) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        `Room capacity (${room.capacity}) is less than section strength (${section.classStrength}).`
+      );
+    }
+
+    // Validate room type compatibility
+    if (section.requiredRoomType && room.roomType !== section.requiredRoomType) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        `Room type (${room.roomType}) does not match required type (${section.requiredRoomType}).`
+      );
+    }
+
+    // Check for conflicts - overlapping allocations for same room
+    const startDateTime = new Date(`${date}T${startTime}`);
+    const endDateTime = new Date(`${date}T${endTime}`);
+
+    const conflicts = await db
+      .collection("allocations")
+      .where("roomId", "==", roomId)
+      .where("date", "==", date)
+      .get();
+
+    for (const conflict of conflicts.docs) {
+      const allocation = conflict.data();
+      const existingStart = new Date(`${allocation.date}T${allocation.startTime}`);
+      const existingEnd = new Date(`${allocation.date}T${allocation.endTime}`);
+
+      // Check for time overlap
+      if (startDateTime < existingEnd && endDateTime > existingStart) {
+        throw new functions.https.HttpsError(
+          "already-exists",
+          `Room is already allocated during this time slot (${allocation.startTime} - ${allocation.endTime}).`
+        );
+      }
+    }
+
+    // Check for section conflicts - same section allocated elsewhere
+    const sectionConflicts = await db
+      .collection("allocations")
+      .where("sectionId", "==", sectionId)
+      .where("date", "==", date)
+      .get();
+
+    for (const conflict of sectionConflicts.docs) {
+      const allocation = conflict.data();
+      const existingStart = new Date(`${allocation.date}T${allocation.startTime}`);
+      const existingEnd = new Date(`${allocation.date}T${allocation.endTime}`);
+
+      // Check for time overlap
+      if (startDateTime < existingEnd && endDateTime > existingStart) {
+        throw new functions.https.HttpsError(
+          "already-exists",
+          `Section is already allocated to another room during this time slot (${allocation.startTime} - ${allocation.endTime}).`
+        );
+      }
+    }
+
+    // Create allocation
+    const allocationData = {
+      roomId: roomId,
+      sectionId: sectionId,
+      date: date,
+      startTime: startTime,
+      endTime: endTime,
+      allocatedBy: context.auth.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const allocationRef = await db.collection("allocations").add(allocationData);
+
+    console.log(`Room allocated: ${room.roomName} for ${section.sectionName} (ID: ${allocationRef.id})`);
+
+    return {
+      success: true,
+      allocationId: allocationRef.id,
+      message: "Room allocated successfully.",
+    };
+  } catch (error) {
+    console.error("Error allocating room:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to allocate room.",
+      error.message
+    );
+  }
+});
+
+// AI ROOM SUGGESTIONS FUNCTION (Simplified - without Gemini for now)
+exports.suggestRooms = functions.https.onCall(async (data, context) => {
+  // Check authentication and authorization
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required."
+    );
+  }
+
+  // Check if user is faculty or admin
+  const userDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError(
+      "not-found",
+      "User profile not found."
+    );
+  }
+
+  const userData = userDoc.data();
+  if (userData.role !== "faculty" && userData.role !== "admin") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only faculty and admin users can get room suggestions."
+    );
+  }
+
+  // Validate input data
+  const { sectionStrength, duration = 60, roomType = "classroom" } = data;
+
+  if (!sectionStrength || typeof sectionStrength !== "number" || sectionStrength <= 0) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Section strength is required and must be a positive number."
+    );
+  }
+
+  const validRoomTypes = ["classroom", "lab", "seminar"];
+  if (!validRoomTypes.includes(roomType)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Room type must be one of: classroom, lab, seminar."
+    );
+  }
+
+  try {
+    // Query available rooms that meet criteria
+    let query = db.collection("rooms")
+      .where("isActive", "==", true)
+      .where("capacity", ">=", sectionStrength);
+
+    // Add room type filter if specified
+    if (roomType !== "classroom") {
+      query = query.where("roomType", "==", roomType);
+    }
+
+    const roomsSnapshot = await query.get();
+
+    if (roomsSnapshot.empty) {
+      return {
+        success: true,
+        rooms: [],
+        message: "No suitable rooms found."
+      };
+    }
+
+    // Convert to array and sort by capacity (minimal unused capacity first)
+    const rooms = [];
+    roomsSnapshot.forEach(doc => {
+      rooms.push({
+        roomId: doc.id,
+        ...doc.data()
+      });
+    });
+
+    // Sort by minimal wasted capacity (best fit first)
+    rooms.sort((a, b) => {
+      const wasteA = a.capacity - sectionStrength;
+      const wasteB = b.capacity - sectionStrength;
+      return wasteA - wasteB;
+    });
+
+    // Limit to top 5 suggestions
+    const suggestions = rooms.slice(0, 5);
+
+    console.log(`Room suggestions generated: ${suggestions.length} rooms for ${sectionStrength} students`);
+
+    return {
+      success: true,
+      rooms: suggestions,
+      message: `${suggestions.length} room suggestions generated.`,
+    };
+  } catch (error) {
+    console.error("Error generating room suggestions:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Failed to generate room suggestions.",
       error.message
     );
   }

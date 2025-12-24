@@ -24,18 +24,19 @@ const MOCK_USERS = {
   'faculty@klh.edu.in': { password: 'Faculty@123', name: 'Faculty Member', email: 'faculty@klh.edu.in', role: 'faculty' }
 };
 
-// Mock User class for development
-class MockUser {
-  uid: string;
-  email: string;
-  displayName: string | null;
-
-  constructor(email: string, displayName: string) {
-    this.uid = `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    this.email = email;
-    this.displayName = displayName;
+// Stable mock user objects to prevent infinite re-renders
+const MOCK_USER_OBJECTS = {
+  student: {
+    uid: 'mock-student-uid',
+    email: '2410030001@klh.student',
+    displayName: 'Student One'
+  },
+  faculty: {
+    uid: 'mock-faculty-uid',
+    email: 'faculty@klh.edu.in',
+    displayName: 'Faculty Member'
   }
-}
+};
 
 // Mock Firebase Error class for development
 class MockFirebaseError extends Error {
@@ -58,8 +59,11 @@ const mockSignInWithEmailAndPassword = async (email: string, password: string): 
     throw new MockFirebaseError('auth/wrong-password', 'The password is invalid or the user does not have a password.');
   }
 
+  // Return appropriate mock user based on role
+  const mockUser = userData.role === 'student' ? MOCK_USER_OBJECTS.student : MOCK_USER_OBJECTS.faculty;
+
   return {
-    user: new MockUser(email, userData.name) as any,
+    user: mockUser as any,
     providerId: null,
     operationType: 'signIn'
   };
@@ -67,8 +71,12 @@ const mockSignInWithEmailAndPassword = async (email: string, password: string): 
 
 const mockCreateUserWithEmailAndPassword = async (email: string, password: string): Promise<UserCredential> => {
   // For demo purposes, allow signup but don't actually store
+  // Determine role based on email domain
+  const role = email.endsWith('@klh.edu.in') ? 'faculty' : 'student';
+  const mockUser = role === 'student' ? MOCK_USER_OBJECTS.student : MOCK_USER_OBJECTS.faculty;
+
   return {
-    user: new MockUser(email, email.split('@')[0]) as any,
+    user: mockUser as any,
     providerId: null,
     operationType: 'signUp'
   };
@@ -564,23 +572,28 @@ export const signOut = async (): Promise<void> => {
  * Get current authenticated user
  */
 export const getCurrentUser = (): User | null => {
+  // Check if we're on the client side (browser environment)
+  if (typeof window === 'undefined') {
+    // Server-side: cannot access localStorage, return null
+    return null;
+  }
+
   // Check if Firebase is properly configured
   if (isFirebaseConfigured) {
     return auth.currentUser;
   } else {
     // For mock authentication, check if user is logged in via localStorage
-    const userType = localStorage.getItem('userType');
-    const userRole = localStorage.getItem('userRole');
+    try {
+      const userType = localStorage.getItem('userType');
+      const userRole = localStorage.getItem('userRole');
 
-    if (userType && userRole) {
-      // Create a mock user object for development
-      const mockUser = new MockUser(
-        userType === 'student'
-          ? (localStorage.getItem('rollNumber') || 'mock-student@klh.student')
-          : (localStorage.getItem('email') || 'mock-faculty@klh.edu.in'),
-        userType === 'student' ? 'Mock Student' : 'Mock Faculty'
-      );
-      return mockUser as any;
+      if (userType && userRole) {
+        // Return stable mock user object to prevent infinite re-renders
+        return userRole === 'student' ? MOCK_USER_OBJECTS.student as any : MOCK_USER_OBJECTS.faculty as any;
+      }
+    } catch (error) {
+      // localStorage might not be available in some environments
+      console.warn('localStorage not available:', error);
     }
 
     return null;

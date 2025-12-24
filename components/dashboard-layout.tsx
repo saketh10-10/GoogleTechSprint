@@ -11,13 +11,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  QrCode,
   Building2,
   MessageSquare,
   LogOut,
   User,
   Home,
   ArrowRight,
+  Calendar,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-service";
 
@@ -50,10 +50,10 @@ export function DashboardLayout({
 
   const navigationItems = [
     {
-      href: "/attendai",
-      icon: QrCode,
-      title: "AttendAI",
-      description: "Attendance management system"
+      href: "/events",
+      icon: Calendar,
+      title: "Events",
+      description: "Today's events and attendance"
     },
     {
       href: "/issuehub",

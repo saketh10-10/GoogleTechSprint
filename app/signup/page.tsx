@@ -192,7 +192,7 @@ export default function SignupPage() {
               className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
               asChild
             >
-              <Link href="/attendai">Get Started</Link>
+              <Link href="/events">Get Started</Link>
             </Button>
           </div>
         </div>
