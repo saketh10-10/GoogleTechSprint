@@ -8,6 +8,8 @@ interface SelectProps {
 
 interface SelectTriggerProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   children?: React.ReactNode
+  onValueChange?: (value: string) => void
+  value?: any
 }
 
 interface SelectValueProps {

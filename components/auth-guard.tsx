@@ -48,15 +48,16 @@ export default function AuthGuard({
             await fetchUserRole(firebaseUser.uid);
           } else {
             // No user signed in
+            setUser(null);
+            setUserRole(null);
             setAuthChecked(true);
-            setRoleChecked(true); // No role to check if not authenticated
+            setRoleChecked(true);
             if (requireAuth) {
               router.push('/login');
-              return;
             }
           }
         });
-        return () => unsubscribe();
+        return unsubscribe;
       } else {
         // Use mock authentication (development mode)
         const mockUser = getCurrentUser();
@@ -114,15 +115,32 @@ export default function AuthGuard({
         if (process.env.NODE_ENV === 'development') {
           console.error('Error fetching user role:', error);
         }
-        // For network issues or permission errors, allow access but log the issue
-        setUserRole(null);
+
+        // Handle failure by checking local cache before giving up
+        const cachedRole = localStorage.getItem('userType') || localStorage.getItem('userRole');
+        if (cachedRole) {
+          console.log('🔄 Fallback to cached role in AuthGuard');
+          setUserRole(cachedRole);
+        } else {
+          setUserRole(null);
+        }
       } finally {
         setRoleChecked(true);
       }
     };
 
-    checkAuth();
-  }, [router, pathname, allowedRoles, requireAuth]);
+    let unsubscribe: (() => void) | undefined;
+
+    checkAuth().then(cleanup => {
+      if (typeof cleanup === 'function') {
+        unsubscribe = cleanup;
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [router, pathname, requireAuth, requireRole]);
 
   // Show loading only if we're still checking auth or if we require role data and it's not loaded
   const shouldShowLoading = !authChecked || (requireRole && !roleChecked);

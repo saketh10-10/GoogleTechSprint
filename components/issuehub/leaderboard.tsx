@@ -8,14 +8,25 @@ import { Trophy, Medal, Award, TrendingUp } from "lucide-react";
 import { getLeaderboard } from "@/lib/issuehub-service";
 import { LeaderboardEntry } from "@/lib/types";
 
-export function Leaderboard() {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+interface LeaderboardProps {
+  entries?: LeaderboardEntry[];
+  loading?: boolean;
+}
+
+export function Leaderboard({ entries, loading: propLoading }: LeaderboardProps) {
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(entries || []);
+  const [loading, setLoading] = useState(propLoading !== undefined ? propLoading : true);
 
   useEffect(() => {
+    if (entries) {
+      setLeaderboard(entries);
+      setLoading(propLoading !== undefined ? propLoading : false);
+      return;
+    }
+
     const loadLeaderboard = async () => {
       try {
-        const data = await getLeaderboard(10);
+        const data = await getLeaderboard();
         setLeaderboard(data);
       } catch (error) {
         console.error('Error loading leaderboard:', error);
@@ -25,7 +36,7 @@ export function Leaderboard() {
     };
 
     loadLeaderboard();
-  }, []);
+  }, [entries, propLoading]);
 
   const getRankIcon = (rank: number) => {
     switch (rank) {

@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { X, Loader2 } from "lucide-react"
-import { createQuestion } from "@/lib/issuehub-service"
-import { getAuth } from "firebase/auth"
+import { createQuestion, hasUserUpvoted } from "@/lib/issuehub-service"
+import { getCurrentUser } from "@/lib/auth-service"
 
 interface PostQuestionDialogProps {
   open: boolean
@@ -34,8 +34,7 @@ export function PostQuestionDialog({ open, onOpenChange, onPost }: PostQuestionD
     e.preventDefault()
     if (isSubmitting) return
 
-    const auth = getAuth()
-    const user = auth.currentUser
+    const user = getCurrentUser()
 
     if (!user) {
       alert("Authentication Required: You must be logged in to post questions.")
@@ -151,11 +150,10 @@ export function PostQuestionDialog({ open, onOpenChange, onPost }: PostQuestionD
                   variant="outline"
                   size="sm"
                   onClick={() => setCategory(cat)}
-                  className={`${
-                    category === cat
+                  className={`${category === cat
                       ? "bg-primary border-primary text-white"
                       : "border-secondary hover:bg-secondary bg-transparent text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   {cat}
                 </Button>

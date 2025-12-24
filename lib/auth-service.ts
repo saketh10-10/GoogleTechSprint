@@ -584,12 +584,11 @@ export const getCurrentUser = (): User | null => {
   } else {
     // For mock authentication, check if user is logged in via localStorage
     try {
-      const userType = localStorage.getItem('userType');
-      const userRole = localStorage.getItem('userRole');
+      const role = localStorage.getItem('userRole') || localStorage.getItem('userType');
 
-      if (userType && userRole) {
+      if (role) {
         // Return stable mock user object to prevent infinite re-renders
-        return userRole === 'student' ? MOCK_USER_OBJECTS.student as any : MOCK_USER_OBJECTS.faculty as any;
+        return role === 'student' ? MOCK_USER_OBJECTS.student as any : MOCK_USER_OBJECTS.faculty as any;
       }
     } catch (error) {
       // localStorage might not be available in some environments

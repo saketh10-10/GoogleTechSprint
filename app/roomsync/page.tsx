@@ -20,9 +20,10 @@ import {
   Edit,
   Trash2,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-service";
-import { doc, getDoc, collection, addDoc, getDocs, query, where, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
@@ -139,111 +140,68 @@ const RoomSyncPage = memo(function RoomSyncPage() {
     };
   }, []);
 
-  // Authentication check
+  // Authentication check - Optimized for fast initial response
   useEffect(() => {
     const checkAuth = async () => {
-      const user = getCurrentUser();
+      // 1. Quick check: Try to use cached role for immediate UI response
+      const cachedRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+      const cachedUser = typeof window !== 'undefined' ? localStorage.getItem('authUser') : null;
 
-      if (!user) {
-        router.push("/login");
-        return;
+      if (cachedRole) {
+        setUserRole(cachedRole);
+        setIsAuthorized(true);
+        setIsLoading(false); // Stop showing the main loader early
+        if (cachedRole === 'student') setActiveTab('dashboard');
+        setLoadingProgress('Validating session...');
       }
 
-      setCurrentUser(user);
+      const user = getCurrentUser();
+      if (!user) {
+        // Only redirect if we don't even have a cached user
+        if (!cachedUser) {
+          router.push("/login");
+          return;
+        }
+      } else {
+        setCurrentUser(user);
+        if (typeof window !== 'undefined') localStorage.setItem('authUser', JSON.stringify({ uid: user.uid, email: user.email }));
+      }
 
-      // Try to get user role from Firestore
+      // 2. Background validation: Verify role from Firestore
       try {
+        if (!user) return; // Wait for user if not loaded yet
+
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          const userRole = userData.role;
+          const role = userData.role;
 
-          // Store role locally for offline access
-          localStorage.setItem('userRole', userRole);
-
-          setUserRole(userRole);
+          localStorage.setItem('userRole', role);
+          setUserRole(role);
           setIsAuthorized(true);
 
-          if (userRole === 'student') {
+          if (!cachedRole && role === 'student') {
             setActiveTab('dashboard');
           }
-        } else {
-          // User document doesn't exist - redirect to login
-          console.warn('User document not found, redirecting to login');
+        } else if (!cachedRole) {
           router.push('/login');
           return;
         }
       } catch (error: any) {
-        console.warn('Error checking user role from Firestore:', error.message);
-
-        // Handle offline/network errors by using cached role
-        if (error.code === 'unavailable' || error.message?.includes('offline')) {
-          console.log('Offline mode detected, using cached user role');
-
-          // Try to get role from localStorage as fallback
-          const cachedRole = localStorage.getItem('userRole');
-
-          if (cachedRole) {
-            console.log('Using cached role for offline access');
-            setUserRole(cachedRole);
-            setIsOffline(true);
-            setIsAuthorized(true);
-
-            if (cachedRole === 'student') {
-              setActiveTab('dashboard');
-            }
-          } else {
-            console.warn('No valid cached role found, redirecting to login');
-            router.push('/login');
-            return;
-          }
-        } else if (error.code === 'permission-denied') {
-          // Firestore security rules blocking access
-          console.error('Permission denied accessing user document');
+        console.warn('Background role validation failed:', error.message);
+        // If we have a cached role, we're already authorized, so we just continue
+        if (!cachedRole) {
           router.push('/login');
-          return;
-        } else {
-          // Other errors - redirect to login
-          console.error('Unknown error accessing user document:', error.code);
-          router.push('/login');
-          return;
         }
+      } finally {
+        setIsLoading(false);
+        setLoadingProgress('');
       }
-
-      setIsLoading(false);
     };
 
     checkAuth();
   }, [router]);
 
-  // Optimized manual refresh function with parallel loading
-  const refreshData = async () => {
-    if (!isOnline) {
-      alert('Cannot refresh data while offline');
-      return;
-    }
-
-    setDataLoading(true);
-    try {
-      console.log('Manually refreshing data in parallel...');
-      const startTime = Date.now();
-
-      await Promise.all([
-        fetchRooms(),
-        fetchSections(),
-        fetchAllocations()
-      ]);
-
-      const endTime = Date.now();
-      setLastDataRefresh(new Date());
-      console.log(`Data refresh completed in ${endTime - startTime}ms`);
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-      alert('Failed to refresh data. Please check your connection.');
-    } finally {
-      setDataLoading(false);
-    }
-  };
 
   // Memoized computed values for performance optimization
   const activeRooms = useMemo(() => rooms.filter(room => room.isActive), [rooms]);
@@ -256,74 +214,61 @@ const RoomSyncPage = memo(function RoomSyncPage() {
     }));
   }, [allocations, rooms, sections]);
 
-  // Optimized parallel data loading for faster performance
+  // Real-time synchronization
   useEffect(() => {
-    if (isAuthorized) {
-      const loadData = async () => {
-        setDataLoading(true);
-        try {
-          if (isOnline) {
-            // Load all data in parallel for maximum speed
-            console.log('Loading RoomSync data...');
-            const startTime = Date.now();
+    if (!isAuthorized) return;
 
-            setLoadingProgress('Fetching rooms...');
-            const roomsPromise = fetchRooms();
+    console.log('Establishing real-time RoomSync listeners...');
+    const { collection, query, orderBy, onSnapshot, where, limit } = require('firebase/firestore');
 
-            setLoadingProgress('Fetching sections...');
-            const sectionsPromise = fetchSections();
+    // 1. Rooms listener
+    const roomsQuery = query(collection(db, 'rooms'), orderBy('roomName', 'asc'));
+    const unsubscribeRooms = onSnapshot(roomsQuery, (snapshot: any) => {
+      const roomsData = snapshot.docs.map((doc: any) => ({
+        ...doc.data(),
+        roomId: doc.id
+      })) as Room[];
+      setRooms(roomsData);
+    });
 
-            setLoadingProgress('Fetching allocations...');
-            const allocationsPromise = fetchAllocations();
+    // 2. Sections listener
+    const sectionsQuery = query(collection(db, 'sections'), orderBy('createdAt', 'desc'));
+    const unsubscribeSections = onSnapshot(sectionsQuery, (snapshot: any) => {
+      const sectionsData = snapshot.docs.map((doc: any) => ({
+        ...doc.data(),
+        sectionId: doc.id
+      })) as Section[];
+      setSections(sectionsData);
+    });
 
-            // Wait for all to complete
-            await Promise.all([roomsPromise, sectionsPromise, allocationsPromise]);
+    // 3. Allocations listener (filtered by dashboard date)
+    const targetDate = allocationForm.date || new Date().toISOString().split('T')[0];
+    const allocationsQuery = query(
+      collection(db, 'allocations'),
+      where('date', '==', targetDate),
+      orderBy('startTime', 'asc'),
+      limit(50)
+    );
 
-            const endTime = Date.now();
-            console.log(`All data loaded in ${endTime - startTime}ms`);
+    const unsubscribeAllocations = onSnapshot(allocationsQuery, (snapshot: any) => {
+      const allocationsData = snapshot.docs.map((doc: any) => ({
+        ...doc.data(),
+        allocationId: doc.id
+      })) as Allocation[];
+      setAllocations(allocationsData);
+      setDataLoading(false);
+    });
 
-            setLoadingProgress('Data loaded successfully!');
-            setLastDataRefresh(new Date());
-          } else {
-            // Load cached data immediately when offline
-            setLoadingProgress('Loading cached data...');
-            console.log('Loading cached data for offline mode...');
-            loadCachedData();
-            setLoadingProgress('Offline mode ready');
-          }
-        } catch (error) {
-          console.error('Error loading data:', error);
-          setLoadingProgress('Loading from cache...');
-          // Try to load cached data as fallback
-          loadCachedData();
-        } finally {
-          // Keep loading state for a moment to show completion
-          setTimeout(() => {
-            setDataLoading(false);
-            setLoadingProgress('');
-          }, 500);
-        }
-      };
+    return () => {
+      unsubscribeRooms();
+      unsubscribeSections();
+      unsubscribeAllocations();
+    };
+  }, [isAuthorized, allocationForm.date]);
 
-      loadData();
-    }
-  }, [isAuthorized, isOnline]);
-
-  // Lazy loading for tabs - load data only when tab is accessed
-  const handleTabChange = async (tab: string) => {
+  // Lazy loading for tabs - Just switches the UI state now as listeners handle data
+  const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-
-    // Mark tab as loaded
-    setTabDataLoaded(prev => ({
-      ...prev,
-      [tab]: true
-    }));
-
-    // If switching to allocation tab and no suggestions loaded, load them
-    if (tab === 'allocation' && suggestedRooms.length === 0) {
-      // Load AI suggestions when allocation tab is opened
-      // This will be triggered when user selects a section
-    }
   };
 
   // Load cached data for offline scenarios
@@ -360,130 +305,6 @@ const RoomSyncPage = memo(function RoomSyncPage() {
   };
 
   // Optimized data fetching functions with useCallback for performance
-  const fetchRooms = useCallback(async () => {
-    if (!isOnline) {
-      console.log('Skipping room fetch - offline mode');
-      return;
-    }
-
-    try {
-      console.log('Fetching rooms from Firestore...');
-      const roomsRef = collection(db, 'rooms');
-      const q = query(roomsRef, orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const roomsData = querySnapshot.docs.map(doc => ({
-        ...doc.data(),
-        roomId: doc.id
-      })) as Room[];
-
-      console.log(`Fetched ${roomsData.length} rooms`);
-      setRooms(roomsData);
-
-      // Cache rooms locally for offline access
-      localStorage.setItem('cachedRooms', JSON.stringify(roomsData));
-    } catch (error: any) {
-      console.error('Error fetching rooms:', error);
-
-      // Try to load from cache if available
-      const cachedRooms = localStorage.getItem('cachedRooms');
-      if (cachedRooms) {
-        try {
-          const cachedData = JSON.parse(cachedRooms);
-          setRooms(cachedData);
-          console.log('Loaded rooms from cache');
-        } catch (parseError) {
-          console.error('Error parsing cached rooms:', parseError);
-        }
-      }
-    }
-  }, [isOnline]);
-
-  const fetchSections = useCallback(async () => {
-    if (!isOnline) {
-      console.log('Skipping section fetch - offline mode');
-      return;
-    }
-
-    try {
-      console.log('Fetching sections from Firestore...');
-      const sectionsRef = collection(db, 'sections');
-      const q = query(sectionsRef, orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const sectionsData = querySnapshot.docs.map(doc => ({
-        ...doc.data(),
-        sectionId: doc.id
-      })) as Section[];
-
-      console.log(`Fetched ${sectionsData.length} sections`);
-      setSections(sectionsData);
-
-      // Cache sections locally for offline access
-      localStorage.setItem('cachedSections', JSON.stringify(sectionsData));
-    } catch (error: any) {
-      console.error('Error fetching sections:', error);
-
-      // Try to load from cache if available
-      const cachedSections = localStorage.getItem('cachedSections');
-      if (cachedSections) {
-        try {
-          const cachedData = JSON.parse(cachedSections);
-          setSections(cachedData);
-          console.log('Loaded sections from cache');
-        } catch (parseError) {
-          console.error('Error parsing cached sections:', parseError);
-        }
-      }
-    }
-  }, [isOnline]);
-
-  const fetchAllocations = useCallback(async () => {
-    if (!isOnline) {
-      console.log('Skipping allocation fetch - offline mode');
-      return;
-    }
-
-    try {
-      const allocationsRef = collection(db, 'allocations');
-      const q = query(allocationsRef, orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const allocationsData = querySnapshot.docs.map(doc => ({
-        ...doc.data(),
-        allocationId: doc.id
-      })) as Allocation[];
-
-      // Enrich with room and section names
-      const enrichedAllocations = allocationsData.map(allocation => ({
-        ...allocation,
-        roomName: rooms.find(r => r.roomId === allocation.roomId)?.roomName || 'Unknown Room',
-        sectionName: sections.find(s => s.sectionId === allocation.sectionId)?.sectionName || 'Unknown Section'
-      }));
-
-      setAllocations(enrichedAllocations);
-
-      // Cache allocations locally
-      localStorage.setItem('cachedAllocations', JSON.stringify(allocationsData));
-    } catch (error: any) {
-      console.error('Error fetching allocations:', error);
-
-      // Try to load from cache if available
-      const cachedAllocations = localStorage.getItem('cachedAllocations');
-      if (cachedAllocations) {
-        try {
-          const allocationsData = JSON.parse(cachedAllocations);
-          // Enrich with room and section names from current state
-          const enrichedAllocations = allocationsData.map((allocation: any) => ({
-            ...allocation,
-            roomName: rooms.find(r => r.roomId === allocation.roomId)?.roomName || 'Unknown Room',
-            sectionName: sections.find(s => s.sectionId === allocation.sectionId)?.sectionName || 'Unknown Section'
-          }));
-          setAllocations(enrichedAllocations);
-          console.log('Loaded allocations from cache');
-        } catch (parseError) {
-          console.error('Error parsing cached allocations:', parseError);
-        }
-      }
-    }
-  }, [isOnline, rooms, sections]);
 
   // Form handlers
   const handleCreateRoom = async (e: React.FormEvent) => {
@@ -500,7 +321,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
 
       if (result.data.success) {
         setNewRoom({ roomName: "", capacity: "", roomType: "classroom" });
-        fetchRooms();
+        // Real-time listener handles the update
         alert('Room created successfully!');
       } else {
         alert(result.data.error || 'Failed to create room');
@@ -528,7 +349,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
 
       if (result.data.success) {
         setNewSection({ department: "", sectionName: "", classStrength: "", requiredRoomType: "classroom" });
-        fetchSections();
+        // Real-time listener handles the update
         alert('Section created successfully!');
       } else {
         alert(result.data.error || 'Failed to create section');
@@ -590,7 +411,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
       if (result.data.success) {
         setAllocationForm({ sectionId: "", date: "", startTime: "", endTime: "" });
         setSuggestedRooms([]);
-        fetchAllocations();
+        // Real-time listener handles the update
         alert('Room allocated successfully!');
       } else {
         alert(result.data.error || 'Failed to allocate room');
@@ -735,16 +556,6 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                     Last updated: {lastDataRefresh.toLocaleTimeString()}
                   </div>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={refreshData}
-                  disabled={dataLoading || !isOnline}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className={`w-4 h-4 ${dataLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
               </div>
             </div>
             <p className="text-muted-foreground">
@@ -1105,14 +916,28 @@ const RoomSyncPage = memo(function RoomSyncPage() {
             {/* Allocation Dashboard Tab */}
             <TabsContent value="dashboard" className="space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5" />
-                    Room Allocation Dashboard
-                  </CardTitle>
-                  <CardDescription>
-                    View all current room allocations
-                  </CardDescription>
+                <CardHeader className="flex md:flex-row items-center justify-between gap-4 space-y-0">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
+                      Room Allocation Dashboard
+                    </CardTitle>
+                    <CardDescription>
+                      View room occupancy for {allocationForm.date}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">View Day:</span>
+                    <Input
+                      type="date"
+                      value={allocationForm.date}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        setAllocationForm(prev => ({ ...prev, date: newDate }));
+                      }}
+                      className="max-w-[150px] bg-secondary/30"
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">

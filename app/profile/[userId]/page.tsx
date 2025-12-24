@@ -22,7 +22,7 @@ import {
   TrendingUp,
   MessageCircle
 } from "lucide-react";
-import { AuthGuard } from "@/components/auth-guard";
+import AuthGuard from "@/components/auth-guard";
 import {
   getUserProfile,
   isUserFollowing,
@@ -281,8 +281,8 @@ export default function UserProfilePage() {
                   </div>
                   <Badge variant="outline">
                     {profile.reputation > 100 ? 'Expert' :
-                     profile.reputation > 50 ? 'Contributor' :
-                     profile.reputation > 10 ? 'Helper' : 'Newcomer'}
+                      profile.reputation > 50 ? 'Contributor' :
+                        profile.reputation > 10 ? 'Helper' : 'Newcomer'}
                   </Badge>
                 </div>
               </CardContent>

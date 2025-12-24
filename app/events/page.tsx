@@ -6,7 +6,7 @@ import AuthGuard from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, Users, Loader2, Plus } from "lucide-react";
+import { Calendar, Clock, MapPin, Users, Loader2, Plus, Trash2 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-service";
 
 interface Event {
@@ -27,43 +27,67 @@ export default function EventsPage() {
   const [isFaculty, setIsFaculty] = useState(false);
 
   useEffect(() => {
-    fetchTodaysEvents();
-    // Check if user is faculty to show create event button
+    // 1. Initial setup
     const user = getCurrentUser();
     if (user) {
-      // For development, check localStorage role
       const userRole = localStorage.getItem('userType') || localStorage.getItem('userRole');
       setIsFaculty(userRole === 'faculty');
     }
+
+    // 2. Real-time subscription
+    const { collection, query, orderBy, onSnapshot, Timestamp } = require('firebase/firestore');
+    const { db } = require('@/lib/firebase');
+
+    setLoading(true);
+    const q = query(collection(db, 'events'), orderBy('date', 'asc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot: any) => {
+      const liveEvents = snapshot.docs.map((doc: any) => {
+        const data = doc.data();
+        let dateString = data.date;
+        if (data.date instanceof Timestamp) {
+          dateString = data.date.toDate().toISOString().split('T')[0];
+        }
+        return {
+          ...data,
+          eventId: doc.id,
+          date: dateString
+        };
+      });
+      setEvents(liveEvents);
+      setLoading(false);
+    }, (err: any) => {
+      console.error('Events subscription error:', err);
+      setError('Failed to sync events. Using offline data.');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const fetchTodaysEvents = async () => {
+  const handleDeleteEvent = async (e: React.MouseEvent, eventId: string) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this event?')) return;
+
     try {
       setLoading(true);
-      setError(null);
-
-      // Call Cloud Function to get today's events
-      const result = await fetch('/api/events', {
-        method: 'GET',
+      const response = await fetch('/api/events/delete', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ eventId }),
       });
 
-      if (!result.ok) {
-        throw new Error(`Failed to fetch events: ${result.status}`);
-      }
-
-      const data = await result.json();
-
+      const data = await response.json();
       if (data.success) {
-        setEvents(data.events);
+        setEvents(prev => prev.filter(e => e.eventId !== eventId));
       } else {
-        throw new Error(data.error || 'Failed to load events');
+        alert(data.error || 'Failed to delete event');
       }
-    } catch (err: any) {
-      console.error('Error fetching events:', err);
-      setError(err.message || 'Failed to load events');
+    } catch (err) {
+      console.error('Error deleting event:', err);
+      alert('An error occurred while deleting the event');
     } finally {
       setLoading(false);
     }
@@ -98,7 +122,7 @@ export default function EventsPage() {
             </div>
             <h2 className="text-xl font-semibold mb-2">Failed to Load Events</h2>
             <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={fetchTodaysEvents} className="w-full">
+            <Button onClick={() => window.location.reload()} className="w-full">
               Try Again
             </Button>
           </div>
@@ -160,9 +184,19 @@ export default function EventsPage() {
                           {event.description || 'No description available'}
                         </CardDescription>
                       </div>
-                      <Badge variant="secondary" className="ml-2">
-                        Today
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {isFaculty && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={(e) => handleDeleteEvent(e, event.eventId)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Badge variant="secondary">Today</Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

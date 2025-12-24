@@ -74,41 +74,37 @@ export async function POST(request: NextRequest) {
       venue: venue.trim(),
       description: description?.trim() || '',
       createdAt: createdAt || new Date().toISOString(),
-      createdBy: createdBy || 'faculty',
+      createdBy: createdBy || 'unknown',
+      createdByRole: 'faculty', // Since this is a faculty-only API
       status: 'active'
     };
 
-    // For development, we'll simulate successful creation
-    // In production, this would save to Firestore
-    console.log('Event created successfully (development mode):', eventData.eventId);
-
-    console.log('Event created successfully:', eventData);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Event created successfully',
-      event: eventData,
-      eventId: eventData.eventId
-    });
-
-    // In production, uncomment this code to save to Firestore:
-    /*
+    // Live Firestore creation
     try {
-      const docRef = await addDoc(collection(db, 'events'), eventData);
+      const { collection, addDoc, Timestamp } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+
+      const docData = {
+        ...eventData,
+        date: Timestamp.fromDate(new Date(date)),
+        createdAt: Timestamp.now()
+      };
+
+      const docRef = await addDoc(collection(db, 'events'), docData);
+
       return NextResponse.json({
         success: true,
         message: 'Event created successfully',
         eventId: docRef.id,
         event: { ...eventData, id: docRef.id }
       });
-    } catch (error) {
-      console.error('Error creating event:', error);
+    } catch (saveError) {
+      console.error('Error saving event to Firestore:', saveError);
       return NextResponse.json(
-        { success: false, error: 'Failed to create event in database' },
+        { success: false, error: 'Database save failed', details: saveError instanceof Error ? saveError.message : String(saveError) },
         { status: 500 }
       );
     }
-    */
 
   } catch (error) {
     console.error('API Error:', error);

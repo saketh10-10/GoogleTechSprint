@@ -33,6 +33,7 @@ export interface Post {
   description: string;
   authorId: string;
   authorName: string;
+  createdByRole: 'student' | 'faculty';
   category: string;
   tags: string[];
   upvotes: number;
@@ -50,6 +51,7 @@ export interface Answer {
   content: string;
   authorId: string;
   authorName: string;
+  createdByRole: 'student' | 'faculty';
   upvotes: number;
   isAccepted: boolean;
   createdAt: Date;

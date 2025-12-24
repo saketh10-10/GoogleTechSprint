@@ -825,6 +825,8 @@ exports.createRoomAllocation = functions.https.onCall(async (data, context) => {
       duration: duration || 60,
       allocatedBy: userId,
       allocatedByRole: roleCheck.role,
+      createdBy: userId,
+      createdByRole: roleCheck.role,
       createdAt: FieldValue.serverTimestamp(),
       status: "active",
     };
@@ -1311,6 +1313,7 @@ exports.createQuestion = functions.https.onCall(async (data, context) => {
         description: normalizedDesc
       },
       createdBy: context.auth.uid,
+      createdByRole: userData.role,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       upvotesCount: 0,
       answersCount: 0,
@@ -1454,6 +1457,7 @@ exports.postAnswer = functions.https.onCall(async (data, context) => {
       questionId: questionId,
       content: content.trim(),
       createdBy: context.auth.uid,
+      createdByRole: userData.role,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       upvotesCount: 0
     };
