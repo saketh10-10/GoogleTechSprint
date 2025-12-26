@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RoomSync Dashboard - KLH</title>
     <link rel="stylesheet" href="css/roomsync.css">
+    <script src="../firebase-config.js"></script>
 </head>
 
 <body>
@@ -190,16 +191,8 @@
             limit
         } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-        // Firebase Configuration
-        const firebaseConfig = {
-            apiKey: "***REMOVED***",
-            authDomain: "edusync-78dbe.firebaseapp.com",
-            projectId: "edusync-78dbe",
-            storageBucket: "edusync-78dbe.firebasestorage.app",
-            messagingSenderId: "463839723366",
-            appId: "1:463839723366:web:75ee6ceb5dd571c87452a7",
-            measurementId: "G-YQX0B9SG50"
-        };
+        // Firebase Configuration - Loaded from external file
+        const firebaseConfig = window.firebaseConfig;
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);

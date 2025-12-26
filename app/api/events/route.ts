@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '@/lib/firebase';
+import { app, db } from '@/lib/firebase';
+import { collection, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
 
 // GET /api/events - Fetch today's events
 export async function GET(request: NextRequest) {
@@ -9,9 +10,6 @@ export async function GET(request: NextRequest) {
     // In production, this would query Firestore for all events
     // Live Firestore fetch
     try {
-      const { collection, getDocs, query, orderBy, Timestamp } = await import('firebase/firestore');
-      const { db } = await import('@/lib/firebase');
-
       if (!db || typeof db !== 'object') {
         throw new Error('Firestore not initialized');
       }

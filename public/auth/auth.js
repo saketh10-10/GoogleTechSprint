@@ -12,17 +12,17 @@ import {
 
 // ============================================================
 // FIREBASE CONFIGURATION
-// Replace with your actual Firebase project credentials
-// Get them from: Firebase Console > Project Settings > Your apps
+// Loaded from external firebase-config.js file
+// Make sure firebase-config.js is loaded in your HTML before this script
 // ============================================================
-const firebaseConfig = {
-  apiKey: "***REMOVED***",
-  authDomain: "edusync-78dbe.firebaseapp.com",
-  projectId: "edusync-78dbe",
-  storageBucket: "edusync-78dbe.firebasestorage.app",
-  messagingSenderId: "463839723366",
-  appId: "1:463839723366:web:75ee6ceb5dd571c87452a7",
-  measurementId: "G-YQX0B9SG50",
+const firebaseConfig = window.firebaseConfig || {
+  apiKey: "YOUR_NEW_API_KEY_HERE",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID_HERE",
+  appId: "YOUR_APP_ID_HERE",
+  measurementId: "YOUR_MEASUREMENT_ID_HERE",
 };
 
 // Initialize Firebase

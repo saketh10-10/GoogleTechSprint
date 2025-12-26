@@ -31,6 +31,9 @@ firestore-debug.log*
 .env.local
 .env*.local
 
+# Firebase config with credentials
+public/firebase-config.js
+
 # vercel
 .vercel
 

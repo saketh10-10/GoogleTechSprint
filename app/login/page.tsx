@@ -388,7 +388,6 @@ export default function LoginPage() {
 
               {/* Sign Up Link */}
               <div className="text-center text-lg">
-                \n{" "}
                 <span className="text-gray-400">Don't have an account? </span>
                 <button
                   type="button"

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/firebase';
+import { doc, deleteDoc } from 'firebase/firestore';
 
 // POST /api/events/delete - Delete an existing event (Faculty only)
 export async function POST(request: NextRequest) {
@@ -13,9 +15,6 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-            const { doc, deleteDoc } = await import('firebase/firestore');
-            const { db } = await import('@/lib/firebase');
-
             const eventRef = doc(db, 'events', eventId);
             await deleteDoc(eventRef);
 

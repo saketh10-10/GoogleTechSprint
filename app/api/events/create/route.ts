@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-service';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
 
 // POST /api/events/create - Create a new event (Faculty only)
 export async function POST(request: NextRequest) {
@@ -81,9 +83,6 @@ export async function POST(request: NextRequest) {
 
     // Live Firestore creation
     try {
-      const { collection, addDoc, Timestamp } = await import('firebase/firestore');
-      const { db } = await import('@/lib/firebase');
-
       if (!db || typeof db !== 'object') {
         throw new Error('Firestore not initialized');
       }
