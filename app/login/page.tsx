@@ -32,6 +32,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
 
   // Error messages
   const [rollNumberError, setRollNumberError] = useState("");
@@ -67,9 +68,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     // Attempt authentication (with automatic signup fallback)
-    console.log('🔄 Attempting student login with roll number:', rollNumber);
+    console.log("🔄 Attempting student login with roll number:", rollNumber);
     const result = await authenticateUser(rollNumber, password);
-    console.log('📋 Student login result:', result);
+    console.log("📋 Student login result:", result);
 
     if (result.success && result.user) {
       // Store user role and data in localStorage for later use
@@ -78,12 +79,13 @@ export default function LoginPage() {
       localStorage.setItem("rollNumber", rollNumber);
       localStorage.setItem("userRole", userRole);
 
-      // Redirect to role-specific dashboard
-      const dashboardPath = userRole === "faculty" ? "/dashboard/faculty" : "/dashboard/student";
-      router.push(dashboardPath);
+      // Redirect to homepage (logged-in view)
+      router.push("/");
     } else {
       // Show error message for authentication failures
-      console.error('❌ Authentication failed:', result);
+      if (process.env.NODE_ENV === "development") {
+        console.log("⚠️ Student authentication failed:", result.error);
+      }
       setGeneralError(result.message || "Login failed");
       setIsLoading(false);
     }
@@ -110,9 +112,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     // Attempt authentication (with automatic signup fallback)
-    console.log('🔄 Attempting faculty login with email:', email);
+    console.log("🔄 Attempting faculty login with email:", email);
     const result = await authenticateUser(email, password);
-    console.log('📋 Faculty login result:', result);
+    console.log("📋 Faculty login result:", result);
 
     if (result.success && result.user) {
       // Store user role and data in localStorage for later use
@@ -121,12 +123,13 @@ export default function LoginPage() {
       localStorage.setItem("email", email);
       localStorage.setItem("userRole", userRole);
 
-      // Redirect to role-specific dashboard
-      const dashboardPath = userRole === "faculty" ? "/dashboard/faculty" : "/dashboard/student";
-      router.push(dashboardPath);
+      // Redirect to homepage (logged-in view)
+      router.push("/");
     } else {
       // Show error message for authentication failures
-      console.error('❌ Authentication failed:', result);
+      if (process.env.NODE_ENV === "development") {
+        console.log("⚠️ Faculty authentication failed:", result.error);
+      }
       setGeneralError(result.message || "Login failed");
       setIsLoading(false);
     }
@@ -141,175 +144,264 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            KLH Login Portal
-          </CardTitle>
-          <CardDescription className="text-center">
-            Sign in to access your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Tab Switcher */}
-          <div className="flex gap-2 mb-6 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
-            <button
-              type="button"
-              onClick={() => handleTabSwitch("student")}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${loginType === "student"
-                ? "bg-blue-600 text-white shadow-sm"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                }`}
-            >
-              Student Login
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabSwitch("faculty")}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${loginType === "faculty"
-                ? "bg-green-600 text-white shadow-sm"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                }`}
-            >
-              Faculty Login
-            </button>
-          </div>
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
+      <div className="w-full max-w-2xl">
+        {/* Glowing Card Container */}
+        <div className="relative">
+          {/* Glow Effect */}
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl blur opacity-30"></div>
 
-          {/* Student Login Form */}
-          {loginType === "student" && (
-            <form onSubmit={handleStudentLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="rollNumber">Roll Number</Label>
-                <Input
-                  id="rollNumber"
-                  type="text"
-                  placeholder="2410030XXX"
-                  value={rollNumber}
-                  onChange={(e) => setRollNumber(e.target.value)}
-                  className={rollNumberError ? "border-red-500" : ""}
-                  disabled={isLoading}
-                  maxLength={10}
-                />
-                {rollNumberError && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {rollNumberError}
-                  </p>
-                )}
+          {/* Main Card */}
+          <div className="relative bg-[#1a1a1a] border border-gray-800 rounded-2xl shadow-2xl p-12">
+            <div className="space-y-8">
+              {/* Header */}
+              <div className="text-center space-y-3">
+                <h1 className="text-4xl font-bold text-white">
+                  Sign up & verify
+                </h1>
+                <p className="text-lg text-gray-400">
+                  Sign up and complete identity verification to earn a random
+                  reward.
+                </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="student-password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="student-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={passwordError ? "border-red-500 pr-10" : "pr-10"}
+              {/* Tab Switcher */}
+              <div className="flex gap-3 p-1.5 bg-gray-900/50 rounded-lg border border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => handleTabSwitch("student")}
+                  className={`flex-1 py-3 px-6 rounded-md font-semibold transition-all text-lg tracking-wide ${
+                    loginType === "student"
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Student
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTabSwitch("faculty")}
+                  className={`flex-1 py-3 px-6 rounded-md font-semibold transition-all text-lg tracking-wide ${
+                    loginType === "faculty"
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Faculty
+                </button>
+              </div>
+
+              {/* Student Login Form */}
+              {loginType === "student" && (
+                <form onSubmit={handleStudentLogin} className="space-y-5">
+                  <div className="space-y-2">
+                    <Input
+                      id="rollNumber"
+                      type="text"
+                      placeholder="Enter your roll number"
+                      value={rollNumber}
+                      onChange={(e) => setRollNumber(e.target.value)}
+                      className={`bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-14 text-lg ${
+                        rollNumberError ? "border-red-500" : ""
+                      }`}
+                      disabled={isLoading}
+                      maxLength={10}
+                    />
+                    {rollNumberError && (
+                      <p className="text-sm text-red-400">{rollNumberError}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Input
+                        id="student-password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pr-10 h-14 text-lg ${
+                          passwordError ? "border-red-500" : ""
+                        }`}
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                    {passwordError && (
+                      <p className="text-sm text-red-400">{passwordError}</p>
+                    )}
+                  </div>
+
+                  {/* Keep me signed in & Forgot password */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="keepSignedIn"
+                        checked={keepSignedIn}
+                        onChange={(e) => setKeepSignedIn(e.target.checked)}
+                        className="w-5 h-5 rounded border-gray-700 bg-gray-900/50 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900"
+                      />
+                      <label
+                        htmlFor="keepSignedIn"
+                        className="text-base text-gray-300"
+                      >
+                        Keep me signed in
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-base text-gray-300 hover:text-white"
+                      onClick={() => {
+                        /* TODO: Implement forgot password */
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+
+                  {generalError && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/50 rounded-lg">
+                      <p className="text-base text-red-400">{generalError}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 h-14 text-lg font-semibold"
                     disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                {passwordError && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {passwordError}
-                  </p>
-                )}
-              </div>
-
-              {generalError && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {generalError}
-                  </p>
-                </div>
+                    {isLoading ? "Signing in..." : "Sign In"}
+                  </Button>
+                </form>
               )}
 
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign In as Student"}
-              </Button>
-            </form>
-          )}
+              {/* Faculty Login Form */}
+              {loginType === "faculty" && (
+                <form onSubmit={handleFacultyLogin} className="space-y-5">
+                  <div className="space-y-2">
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-14 text-lg ${
+                        emailError ? "border-red-500" : ""
+                      }`}
+                      disabled={isLoading}
+                    />
+                    {emailError && (
+                      <p className="text-sm text-red-400">{emailError}</p>
+                    )}
+                  </div>
 
-          {/* Faculty Login Form */}
-          {loginType === "faculty" && (
-            <form onSubmit={handleFacultyLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="yourname@klh.edu.in"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={emailError ? "border-red-500" : ""}
-                  disabled={isLoading}
-                />
-                {emailError && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {emailError}
-                  </p>
-                )}
-              </div>
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Input
+                        id="faculty-password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pr-10 h-14 text-lg ${
+                          passwordError ? "border-red-500" : ""
+                        }`}
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                    {passwordError && (
+                      <p className="text-sm text-red-400">{passwordError}</p>
+                    )}
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="faculty-password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="faculty-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={passwordError ? "border-red-500 pr-10" : "pr-10"}
+                  {/* Keep me signed in & Forgot password */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="keepSignedInFaculty"
+                        checked={keepSignedIn}
+                        onChange={(e) => setKeepSignedIn(e.target.checked)}
+                        className="w-5 h-5 rounded border-gray-700 bg-gray-900/50 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900"
+                      />
+                      <label
+                        htmlFor="keepSignedInFaculty"
+                        className="text-lg text-gray-300"
+                      >
+                        Keep me signed in
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-lg text-gray-300 hover:text-white"
+                      onClick={() => {
+                        /* TODO: Implement forgot password */
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+
+                  {generalError && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/50 rounded-lg">
+                      <p className="text-base text-red-400">{generalError}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 h-14 text-lg font-semibold"
                     disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                {passwordError && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {passwordError}
-                  </p>
-                )}
-              </div>
-
-              {generalError && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {generalError}
-                  </p>
-                </div>
+                    {isLoading ? "Signing in..." : "Sign In"}
+                  </Button>
+                </form>
               )}
 
-              <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign In as Faculty"}
-              </Button>
-            </form>
-          )}
-
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>
-              New users will have their account created automatically.
-            </p>
+              {/* Sign Up Link */}
+              <div className="text-center text-lg">
+                \n{" "}
+                <span className="text-gray-400">Don't have an account? </span>
+                <button
+                  type="button"
+                  onClick={() => router.push("/signup")}
+                  className="text-white hover:text-blue-400 font-medium"
+                >
+                  Sign Up
+                </button>
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

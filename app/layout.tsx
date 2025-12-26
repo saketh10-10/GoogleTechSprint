@@ -4,10 +4,8 @@ import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
-
-
 export const metadata: Metadata = {
-  title: "AttendAI - AI-Powered Campus Management",
+  title: "EduSync - AI-Powered Campus Management",
   description:
     "Smart attendance, room allocation, and campus community platform powered by AI",
   generator: "v0.app",

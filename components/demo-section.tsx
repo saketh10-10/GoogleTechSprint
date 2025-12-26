@@ -42,7 +42,8 @@ export function DemoSection() {
               See How the Platform Works
             </h2>
             <p className="text-lg text-muted-foreground">
-              Interactive simulation of AttendAI, RoomSync, and IssueHub
+              Interactive simulation of EduSync features: Events, RoomSync, and
+              IssueHub
             </p>
           </div>
 
@@ -88,10 +89,12 @@ export function DemoSection() {
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
                     <div className="space-y-4">
-                      <h3 className="text-2xl font-semibold">Events & Attendance System</h3>
+                      <h3 className="text-2xl font-semibold">
+                        Events & Attendance System
+                      </h3>
                       <p className="text-muted-foreground">
-                        Experience smart attendance tracking with QR code generation,
-                        validation, and automated monitoring.
+                        Experience smart attendance tracking with QR code
+                        generation, validation, and automated monitoring.
                       </p>
 
                       <div className="grid md:grid-cols-3 gap-4 mt-6">
@@ -111,7 +114,8 @@ export function DemoSection() {
                           </div>
                           <h4 className="font-semibold mb-2">QR Generation</h4>
                           <p className="text-sm text-muted-foreground">
-                            Generate secure, time-limited QR codes for attendance
+                            Generate secure, time-limited QR codes for
+                            attendance
                           </p>
                         </div>
 
@@ -119,9 +123,12 @@ export function DemoSection() {
                           <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-3 text-white font-bold">
                             📊
                           </div>
-                          <h4 className="font-semibold mb-2">Real-time Tracking</h4>
+                          <h4 className="font-semibold mb-2">
+                            Real-time Tracking
+                          </h4>
                           <p className="text-sm text-muted-foreground">
-                            Automated attendance validation and email notifications
+                            Automated attendance validation and email
+                            notifications
                           </p>
                         </div>
                       </div>

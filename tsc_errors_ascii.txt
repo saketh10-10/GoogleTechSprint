@@ -1,2 +1,0 @@
-app/roomsync/page.tsx(466,25): error TS1005: ')' expected.
-app/roomsync/page.tsx(467,22): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?

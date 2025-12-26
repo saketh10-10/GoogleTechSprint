@@ -20,7 +20,7 @@ import {
   DocumentData
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { db } from './firebase';
+import { db, getDb } from './firebase';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from './firebase';
 import {
@@ -36,12 +36,26 @@ import {
   UserStats
 } from './types';
 
-// Collection references
-const usersRef = collection(db, 'users');
-const questionsRef = collection(db, 'questions');
-const postsRef = collection(db, 'questions'); // Aliased for legacy code compatibility
-const answersRef = collection(db, 'answers');
-const followsRef = collection(db, 'follows');
+// Safe collection reference creation with validation
+const safeCollection = (collectionName: string) => {
+  try {
+    const firestore = getDb(); // Use helper function to ensure db is initialized
+    if (!firestore || typeof firestore !== 'object') {
+      throw new Error(`Firestore not initialized properly`);
+    }
+    return collection(firestore, collectionName);
+  } catch (error: any) {
+    console.error(`Failed to create collection reference for "${collectionName}":`, error);
+    throw new Error(`Failed to create collection reference for "${collectionName}": ${error.message}`);
+  }
+};
+
+// Collection reference getters - created lazily to avoid initialization issues
+const getUsersRef = () => safeCollection('users');
+const getQuestionsRef = () => safeCollection('questions');
+const getPostsRef = () => safeCollection('questions');
+const getAnswersRef = () => safeCollection('answers');
+const getFollowsRef = () => safeCollection('follows');
 
 /**
  * CACHE SYSTEM
@@ -87,7 +101,7 @@ export const createUserProfile = async (user: User): Promise<void> => {
     lastActive: user.lastActive
   };
 
-  await addDoc(usersRef, userProfile);
+  await addDoc(getUsersRef(), userProfile);
 };
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
@@ -95,7 +109,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
   if (profileCache.has(userId)) return profileCache.get(userId) || null;
 
   try {
-    const userDoc = await getDoc(doc(usersRef, userId));
+    const userDoc = await getDoc(doc(getUsersRef(), userId));
     if (!userDoc.exists()) return null;
     const data = userDoc.data();
     const profile = {
@@ -121,7 +135,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>): Promise<void> => {
-  await updateDoc(doc(usersRef, userId), updates);
+  await updateDoc(doc(getUsersRef(), userId), updates);
   profileCache.delete(userId); // Invalidate cache
 };
 
@@ -136,7 +150,7 @@ export const updateUserStats = async (userId: string, stats: Partial<UserStats>)
   // Recalculate reputation (simple algorithm)
   updates.reputation = increment((stats.totalUpvotesReceived || 0) + (stats.postsCount || 0) * 2 + (stats.answersCount || 0));
 
-  await updateDoc(doc(usersRef, userId), updates);
+  await updateDoc(doc(getUsersRef(), userId), updates);
   profileCache.delete(userId); // Invalidate cache
 };
 
@@ -179,7 +193,7 @@ export const createQuestion = async (questionData: {
 };
 
 export const getPost = async (postId: string): Promise<PostWithDetails | null> => {
-  const postDoc = await getDoc(doc(postsRef, postId));
+  const postDoc = await getDoc(doc(getPostsRef(), postId));
   if (!postDoc.exists()) return null;
 
   const data = postDoc.data();
@@ -211,10 +225,10 @@ export const getQuestions = async (options: {
   // REQUIREMENT 5: Default limit increased to handle smaller initial sets accurately
   const fetchLimit = options.limit || 10;
 
-  let q = query(questionsRef, orderBy('createdAt', 'desc'), limit(fetchLimit));
+  let q = query(getQuestionsRef(), orderBy('createdAt', 'desc'), limit(fetchLimit));
 
   if (options.category && options.category !== 'All') {
-    q = query(questionsRef, where('category', '==', options.category), orderBy('createdAt', 'desc'), limit(fetchLimit));
+    q = query(getQuestionsRef(), where('category', '==', options.category), orderBy('createdAt', 'desc'), limit(fetchLimit));
   }
 
   if (options.startAfter) {
@@ -273,14 +287,14 @@ export const getQuestions = async (options: {
 };
 
 export const updatePost = async (postId: string, updates: Partial<Post>): Promise<void> => {
-  await updateDoc(doc(postsRef, postId), {
+  await updateDoc(doc(getPostsRef(), postId), {
     ...updates,
     updatedAt: Timestamp.fromDate(new Date())
   });
 };
 
 export const incrementPostViews = async (postId: string): Promise<void> => {
-  await updateDoc(doc(postsRef, postId), {
+  await updateDoc(doc(getPostsRef(), postId), {
     views: increment(1)
   });
 };
@@ -302,12 +316,10 @@ export const createAnswer = async (questionId: string, content: string): Promise
     const useEmulators = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
 
     if (isDemoProject && !useEmulators && process.env.NODE_ENV === 'development') {
-      const userRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : 'student';
       console.warn('⚠️ createAnswer Cloud Function failed. Returning mock success for demo.');
       return {
         success: true,
         answerId: 'mock-a-' + Date.now(),
-        createdByRole: userRole,
         message: "Development Mock Success (Demo Project Mode)"
       };
     }
@@ -318,7 +330,7 @@ export const createAnswer = async (questionId: string, content: string): Promise
 export const getAnswersForQuestion = async (questionId: string, limitCount: number = 5): Promise<AnswerWithDetails[]> => {
   // REQUIREMENT 6: Fetch with limit
   const q = query(
-    answersRef,
+    getAnswersRef(),
     where('questionId', '==', questionId),
     orderBy('createdAt', 'asc'),
     limit(limitCount)
@@ -362,7 +374,7 @@ export const getAnswersForQuestion = async (questionId: string, limitCount: numb
 export const getAnswersForPost = getAnswersForQuestion; // Alias
 
 export const updateAnswer = async (answerId: string, updates: Partial<Answer>): Promise<void> => {
-  await updateDoc(doc(answersRef, answerId), {
+  await updateDoc(doc(getAnswersRef(), answerId), {
     ...updates,
     updatedAt: Timestamp.fromDate(new Date())
   });
@@ -408,6 +420,11 @@ export const upvoteAnswer = async (answerId: string): Promise<{ success: boolean
 
 export const hasUserUpvoted = async (userId: string, targetId: string, targetType: 'question' | 'answer'): Promise<boolean> => {
   try {
+    if (!db || typeof db !== 'object') {
+      console.error('Firestore not initialized');
+      return false;
+    }
+
     const collectionName = targetType === 'question' ? 'questionUpvotes' : 'answerUpvotes';
     const upvotesRef = collection(db, collectionName);
 
@@ -433,12 +450,12 @@ export const toggleFollow = async (followerId: string, followingId: string): Pro
   const existingFollow = await getFollowRelationship(followerId, followingId);
 
   if (existingFollow) {
-    await deleteDoc(doc(followsRef, existingFollow.id));
+    await deleteDoc(doc(getFollowsRef(), existingFollow.id));
     await updateUserStats(followerId, { followingCount: -1 });
     await updateUserStats(followingId, { followersCount: -1 });
     return false;
   } else {
-    await addDoc(followsRef, {
+    await addDoc(getFollowsRef(), {
       followerId,
       followingId,
       createdAt: Timestamp.fromDate(new Date())
@@ -456,7 +473,7 @@ export const isUserFollowing = async (followerId: string, followingId: string): 
 
 const getFollowRelationship = async (followerId: string, followingId: string): Promise<Follow | null> => {
   const q = query(
-    followsRef,
+    getFollowsRef(),
     where('followerId', '==', followerId),
     where('followingId', '==', followingId)
   );
@@ -470,13 +487,13 @@ const getFollowRelationship = async (followerId: string, followingId: string): P
 };
 
 export const getFollowers = async (userId: string): Promise<string[]> => {
-  const q = query(followsRef, where('followingId', '==', userId));
+  const q = query(getFollowsRef(), where('followingId', '==', userId));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => (docSnap.data() as any).followerId);
 };
 
 export const getFollowing = async (userId: string): Promise<string[]> => {
-  const q = query(followsRef, where('followerId', '==', userId));
+  const q = query(getFollowsRef(), where('followerId', '==', userId));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => (docSnap.data() as any).followingId);
 };
@@ -592,7 +609,7 @@ export const searchQuestions = async (searchTerm: string, category?: string): Pr
 // ============================================================================
 
 export const subscribeToQuestions = (callback: (questions: PostWithDetails[]) => void, options: { category?: string; limit?: number } = {}) => {
-  let q = query(questionsRef, orderBy('createdAt', 'desc'));
+  let q = query(getQuestionsRef(), orderBy('createdAt', 'desc'));
 
   if (options.category && options.category !== 'All') {
     q = query(q, where('category', '==', options.category));
@@ -649,7 +666,7 @@ export const subscribeToQuestions = (callback: (questions: PostWithDetails[]) =>
 };
 
 export const subscribeToPost = (postId: string, callback: (post: PostWithDetails) => void) => {
-  return onSnapshot(doc(postsRef, postId), async (docSnap) => {
+  return onSnapshot(doc(getPostsRef(), postId), async (docSnap) => {
     if (docSnap.exists()) {
       const post = await getPost(postId);
       if (post) callback(post);
@@ -659,7 +676,7 @@ export const subscribeToPost = (postId: string, callback: (post: PostWithDetails
 
 export const subscribeToAnswers = (postId: string, callback: (answers: AnswerWithDetails[]) => void) => {
   const q = query(
-    answersRef,
+    getAnswersRef(),
     where('questionId', '==', postId),
     orderBy('createdAt', 'asc'),
     limit(20)
@@ -701,7 +718,7 @@ export const subscribeToAnswers = (postId: string, callback: (answers: AnswerWit
 };
 
 export const subscribeToUserProfile = (userId: string, callback: (profile: UserProfile) => void) => {
-  return onSnapshot(doc(usersRef, userId), (docSnap) => {
+  return onSnapshot(doc(getUsersRef(), userId), (docSnap) => {
     if (docSnap.exists()) {
       const data = docSnap.data();
       const profile: UserProfile = {

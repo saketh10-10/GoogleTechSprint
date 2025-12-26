@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -20,6 +18,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-service";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -32,7 +31,7 @@ export function DashboardLayout({
   children,
   userType,
   userIdentifier,
-  title = "Dashboard"
+  title = "Dashboard",
 }: DashboardLayoutProps) {
   const router = useRouter();
 
@@ -53,20 +52,23 @@ export function DashboardLayout({
       href: "/events",
       icon: Calendar,
       title: "Events",
-      description: "Today's events and attendance"
+      description: "Today's events and attendance",
     },
     {
       href: "/issuehub",
       icon: MessageSquare,
       title: "IssueHub",
-      description: "Community Q&A platform"
+      description: "Community Q&A platform",
     },
     {
       href: "/roomsync",
       icon: Building2,
       title: "RoomSync",
-      description: userType === "student" ? "Room allocation info" : "Room management system"
-    }
+      description:
+        userType === "student"
+          ? "Room allocation info"
+          : "Room management system",
+    },
   ];
 
   return (
@@ -79,13 +81,23 @@ export function DashboardLayout({
               href="/"
               className="text-xl font-medium text-foreground tracking-tight"
             >
-              AttendAI
+              EduSync
             </Link>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/")}
+              className="hover:bg-secondary"
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Home
+            </Button>
             <span className="text-sm text-muted-foreground capitalize">
               {userType} Portal
             </span>
+            <ThemeToggle />
             <Button
               variant="outline"
               size="sm"
@@ -109,7 +121,9 @@ export function DashboardLayout({
               <h1 className="text-3xl font-medium text-foreground">{title}</h1>
             </div>
             <p className="text-muted-foreground">
-              Welcome back, {userType === "student" ? "Student" : "Faculty Member"} • {userIdentifier}
+              Welcome back,{" "}
+              {userType === "student" ? "Student" : "Faculty Member"} •{" "}
+              {userIdentifier}
             </p>
           </div>
 
@@ -127,7 +141,9 @@ export function DashboardLayout({
             <CardContent>
               <div className="grid md:grid-cols-3 gap-6">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Account Type</p>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Account Type
+                  </p>
                   <p className="font-medium capitalize">{userType}</p>
                 </div>
                 <div>
@@ -173,7 +189,7 @@ export function DashboardLayout({
       <footer className="border-t border-border py-12 px-6 mt-20">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-muted-foreground text-sm">
-            © 2025 AttendAI. Google TechSprint Project.
+            © 2025 EduSync. Google TechSprint Project.
           </p>
         </div>
       </footer>

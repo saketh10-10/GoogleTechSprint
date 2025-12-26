@@ -164,7 +164,7 @@ export const signInStudent = async (rollNumber: string, password: string): Promi
     };
   } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('❌ STUDENT LOGIN ERROR:', error?.code, error?.message);
+      console.log('⚠️ STUDENT LOGIN FAILED:', error?.code);
     }
     const errorMessage = getAuthErrorMessage(error?.code);
     return {
@@ -207,7 +207,7 @@ export const signInFaculty = async (email: string, password: string): Promise<Au
     };
   } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('❌ FACULTY LOGIN ERROR:', error?.code, error?.message);
+      console.log('⚠️ FACULTY LOGIN FAILED:', error?.code);
     }
     const errorMessage = getAuthErrorMessage(error?.code);
     return {
@@ -368,7 +368,7 @@ export const authenticateUser = async (identifier: string, password: string): Pr
           };
         } catch (signupError: any) {
           if (process.env.NODE_ENV === 'development') {
-            console.error(`❌ ${userType.toUpperCase()} SIGNUP ERROR:`, signupError?.code, signupError?.message);
+            console.log(`⚠️ ${userType.toUpperCase()} SIGNUP FAILED:`, signupError?.code);
           }
           const errorMessage = getAuthErrorMessage(signupError?.code);
           return {
@@ -381,7 +381,7 @@ export const authenticateUser = async (identifier: string, password: string): Pr
         // 4. If login fails with auth/wrong-password, auth/too-many-requests, auth/invalid-email
         // Show error message - DO NOT attempt signup
         if (process.env.NODE_ENV === 'development') {
-          console.error(`❌ ${userType.toUpperCase()} LOGIN ERROR:`, loginError?.code, loginError?.message);
+          console.log(`⚠️ ${userType.toUpperCase()} LOGIN FAILED:`, loginError?.code);
         }
         const errorMessage = getAuthErrorMessage(loginError?.code);
         return {
@@ -393,7 +393,7 @@ export const authenticateUser = async (identifier: string, password: string): Pr
     }
   } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('❌ AUTHENTICATION ERROR:', error?.code, error?.message);
+      console.log('⚠️ AUTHENTICATION FAILED:', error?.code);
     }
     const errorMessage = getAuthErrorMessage(error?.code);
     return {
@@ -472,7 +472,7 @@ export const registerStudent = async (rollNumber: string, password: string): Pro
     };
   } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('❌ STUDENT SIGNUP ERROR:', error?.code, error?.message);
+      console.log('⚠️ STUDENT SIGNUP FAILED:', error?.code);
     }
     const errorMessage = getAuthErrorMessage(error?.code);
     return {
@@ -546,7 +546,7 @@ export const registerFaculty = async (email: string, password: string): Promise<
     };
   } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('❌ FACULTY SIGNUP ERROR:', error?.code, error?.message);
+      console.log('⚠️ FACULTY SIGNUP FAILED:', error?.code);
     }
     const errorMessage = getAuthErrorMessage(error?.code);
     return {
@@ -622,6 +622,10 @@ const getAuthErrorMessage = (errorCode?: string): string => {
       return 'Incorrect password. Please try again.';
     case 'auth/invalid-credential':
       return 'Account not found or invalid credentials. Please sign up if you don\'t have an account.';
+
+    // CONFIGURATION ERRORS
+    case 'auth/configuration-not-found':
+      return 'Firebase Authentication is not properly configured. Please enable Email/Password authentication in Firebase Console.';
 
     // GENERAL ERRORS
     case 'auth/invalid-email':

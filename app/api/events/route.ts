@@ -12,6 +12,10 @@ export async function GET(request: NextRequest) {
       const { collection, getDocs, query, orderBy, Timestamp } = await import('firebase/firestore');
       const { db } = await import('@/lib/firebase');
 
+      if (!db || typeof db !== 'object') {
+        throw new Error('Firestore not initialized');
+      }
+
       const eventsRef = collection(db, 'events');
       const q = query(eventsRef, orderBy('date', 'asc'), orderBy('startTime', 'asc'));
       const querySnapshot = await getDocs(q);

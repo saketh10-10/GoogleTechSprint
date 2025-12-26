@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, useEffect } from "react";
+import { useState, FormEvent, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -15,20 +15,23 @@ import {
 } from "@/lib/auth-validation";
 import { registerStudent, registerFaculty } from "@/lib/auth-service";
 
+// Force dynamic rendering for this page
+export const dynamic = "force-dynamic";
+
 type SignupType = "student" | "faculty";
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [signupType, setSignupType] = useState<SignupType>("student");
 
   // Check URL parameters to set initial tab
   useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'faculty') {
-      setSignupType('faculty');
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "faculty") {
+      setSignupType("faculty");
     } else {
-      setSignupType('student');
+      setSignupType("student");
     }
   }, [searchParams]);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,9 +53,11 @@ export default function SignupPage() {
 
   // Check if user was redirected from login page
   useEffect(() => {
-    const tabParam = searchParams.get('tab');
+    const tabParam = searchParams.get("tab");
     if (tabParam) {
-      setRedirectMessage(`It looks like you don't have a ${tabParam} account yet. Create one below!`);
+      setRedirectMessage(
+        `It looks like you don't have a ${tabParam} account yet. Create one below!`
+      );
     }
   }, [searchParams]);
 
@@ -166,7 +171,7 @@ export default function SignupPage() {
               href="/"
               className="text-xl font-medium text-foreground tracking-tight"
             >
-              AttendAI
+              EduSync
             </Link>
             <div className="hidden md:flex items-center gap-6">
               <Link
@@ -213,8 +218,8 @@ export default function SignupPage() {
           </h1>
 
           <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto text-balance">
-            Join the KLH community and access intelligent campus management tools
-            designed for students and faculty.
+            Join the KLH community and access intelligent campus management
+            tools designed for students and faculty.
           </p>
 
           {/* Tab Switcher */}
@@ -268,14 +273,18 @@ export default function SignupPage() {
             {signupType === "student" && (
               <form onSubmit={handleStudentSignup} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="rollNumber" className="text-left block">Roll Number</Label>
+                  <Label htmlFor="rollNumber" className="text-left block">
+                    Roll Number
+                  </Label>
                   <Input
                     id="rollNumber"
                     type="text"
                     placeholder="2410030XXX"
                     value={rollNumber}
                     onChange={(e) => setRollNumber(e.target.value)}
-                    className={rollNumberError ? "border-red-500" : "border-border"}
+                    className={
+                      rollNumberError ? "border-red-500" : "border-border"
+                    }
                     disabled={isLoading}
                     maxLength={10}
                   />
@@ -287,14 +296,18 @@ export default function SignupPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="student-password" className="text-left block">Password</Label>
+                  <Label htmlFor="student-password" className="text-left block">
+                    Password
+                  </Label>
                   <Input
                     id="student-password"
                     type="password"
                     placeholder="Create a strong password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={passwordError ? "border-red-500" : "border-border"}
+                    className={
+                      passwordError ? "border-red-500" : "border-border"
+                    }
                     disabled={isLoading}
                   />
                   {passwordError && (
@@ -305,14 +318,21 @@ export default function SignupPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="student-confirm-password" className="text-left block">Confirm Password</Label>
+                  <Label
+                    htmlFor="student-confirm-password"
+                    className="text-left block"
+                  >
+                    Confirm Password
+                  </Label>
                   <Input
                     id="student-confirm-password"
                     type="password"
                     placeholder="Confirm your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className={confirmPasswordError ? "border-red-500" : "border-border"}
+                    className={
+                      confirmPasswordError ? "border-red-500" : "border-border"
+                    }
                     disabled={isLoading}
                   />
                   {confirmPasswordError && (
@@ -345,7 +365,9 @@ export default function SignupPage() {
             {signupType === "faculty" && (
               <form onSubmit={handleFacultySignup} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-left block">Email</Label>
+                  <Label htmlFor="email" className="text-left block">
+                    Email
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -363,14 +385,18 @@ export default function SignupPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="faculty-password" className="text-left block">Password</Label>
+                  <Label htmlFor="faculty-password" className="text-left block">
+                    Password
+                  </Label>
                   <Input
                     id="faculty-password"
                     type="password"
                     placeholder="Create a strong password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={passwordError ? "border-red-500" : "border-border"}
+                    className={
+                      passwordError ? "border-red-500" : "border-border"
+                    }
                     disabled={isLoading}
                   />
                   {passwordError && (
@@ -381,14 +407,21 @@ export default function SignupPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="faculty-confirm-password" className="text-left block">Confirm Password</Label>
+                  <Label
+                    htmlFor="faculty-confirm-password"
+                    className="text-left block"
+                  >
+                    Confirm Password
+                  </Label>
                   <Input
                     id="faculty-confirm-password"
                     type="password"
                     placeholder="Confirm your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className={confirmPasswordError ? "border-red-500" : "border-border"}
+                    className={
+                      confirmPasswordError ? "border-red-500" : "border-border"
+                    }
                     disabled={isLoading}
                   />
                   {confirmPasswordError && (
@@ -437,10 +470,24 @@ export default function SignupPage() {
       <footer className="border-t border-border py-12 px-6 mt-20">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-muted-foreground text-sm">
-            © 2025 AttendAI. Google TechSprint Project.
+            © 2025 EduSync. Google TechSprint Project.
           </p>
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      }
+    >
+      <SignupContent />
+    </Suspense>
   );
 }

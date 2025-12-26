@@ -6,7 +6,15 @@ import AuthGuard from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Camera, QrCode, CheckCircle, XCircle, Loader2, ArrowLeft } from "lucide-react";
+import {
+  Camera,
+  QrCode,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  ArrowLeft,
+  Home,
+} from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-service";
 
 export default function QRScannerPage() {
@@ -32,7 +40,7 @@ export default function QRScannerPage() {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' } // Use back camera on mobile
+        video: { facingMode: "environment" }, // Use back camera on mobile
       });
 
       if (videoRef.current) {
@@ -42,14 +50,16 @@ export default function QRScannerPage() {
         setError(null);
       }
     } catch (err) {
-      console.error('Error accessing camera:', err);
-      setError('Camera access denied. Please allow camera permissions and try again.');
+      console.error("Error accessing camera:", err);
+      setError(
+        "Camera access denied. Please allow camera permissions and try again."
+      );
     }
   };
 
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     setIsScanning(false);
@@ -60,7 +70,7 @@ export default function QRScannerPage() {
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext("2d");
 
     if (!context) return null;
 
@@ -68,7 +78,7 @@ export default function QRScannerPage() {
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    return canvas.toDataURL('image/png');
+    return canvas.toDataURL("image/png");
   };
 
   const scanQRCode = async () => {
@@ -84,10 +94,9 @@ export default function QRScannerPage() {
 
       setScanResult(mockQRData);
       await validateQRCode(mockQRData);
-
     } catch (err) {
-      console.error('Error scanning QR code:', err);
-      setError('Failed to scan QR code. Please try again.');
+      console.error("Error scanning QR code:", err);
+      setError("Failed to scan QR code. Please try again.");
     }
   };
 
@@ -97,26 +106,26 @@ export default function QRScannerPage() {
 
     try {
       // Parse QR data (format: "qrId:nonce")
-      const [qrId, nonce] = qrData.split(':');
+      const [qrId, nonce] = qrData.split(":");
 
       if (!qrId || !nonce) {
-        throw new Error('Invalid QR code format');
+        throw new Error("Invalid QR code format");
       }
 
       // For demo, use a mock event ID
       const eventId = "event-001";
 
       // Call validation API
-      const response = await fetch('/api/validate-qr', {
-        method: 'POST',
+      const response = await fetch("/api/validate-qr", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           qrId,
           eventId,
           nonce,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         }),
       });
 
@@ -138,10 +147,10 @@ export default function QRScannerPage() {
         }, 3000);
       }
     } catch (err: any) {
-      console.error('Validation error:', err);
+      console.error("Validation error:", err);
       setValidationResult({
         success: false,
-        error: err.message || 'Validation failed'
+        error: err.message || "Validation failed",
       });
     } finally {
       setIsValidating(false);
@@ -155,17 +164,21 @@ export default function QRScannerPage() {
   };
 
   return (
-    <AuthGuard allowedRoles={['faculty', 'admin']} requireAuth={true} requireRole={true}>
+    <AuthGuard
+      allowedRoles={["faculty", "admin"]}
+      requireAuth={true}
+      requireRole={true}
+    >
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
         <div className="max-w-md mx-auto">
           <div className="mb-6 flex items-center gap-4">
             <Button
               variant="ghost"
-              onClick={() => router.back()}
+              onClick={() => router.push("/")}
               className="hover:bg-gray-100 dark:hover:bg-gray-800"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+              <Home className="w-4 h-4 mr-2" />
+              Home
             </Button>
             <h1 className="text-xl font-semibold">QR Scanner</h1>
           </div>
@@ -230,7 +243,9 @@ export default function QRScannerPage() {
 
               {/* Validation Result */}
               {validationResult && (
-                <Alert variant={validationResult.success ? "default" : "destructive"}>
+                <Alert
+                  variant={validationResult.success ? "default" : "destructive"}
+                >
                   {validationResult.success ? (
                     <CheckCircle className="h-4 w-4" />
                   ) : (
@@ -241,12 +256,15 @@ export default function QRScannerPage() {
                       <div>
                         <strong>✅ Attendance Marked!</strong>
                         <div className="text-sm mt-1">
-                          Event: {validationResult.eventTitle}<br/>
+                          Event: {validationResult.eventTitle}
+                          <br />
                           ID: {validationResult.attendanceId}
                         </div>
                       </div>
                     ) : (
-                      <strong>❌ Validation Failed: {validationResult.error}</strong>
+                      <strong>
+                        ❌ Validation Failed: {validationResult.error}
+                      </strong>
                     )}
                   </AlertDescription>
                 </Alert>
@@ -255,13 +273,21 @@ export default function QRScannerPage() {
               {/* Controls */}
               <div className="space-y-2">
                 {!isScanning ? (
-                  <Button onClick={startCamera} className="w-full" disabled={isValidating}>
+                  <Button
+                    onClick={startCamera}
+                    className="w-full"
+                    disabled={isValidating}
+                  >
                     <Camera className="w-4 h-4 mr-2" />
                     Start Camera
                   </Button>
                 ) : (
                   <>
-                    <Button onClick={scanQRCode} className="w-full" disabled={isValidating}>
+                    <Button
+                      onClick={scanQRCode}
+                      className="w-full"
+                      disabled={isValidating}
+                    >
                       {isValidating ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -274,14 +300,22 @@ export default function QRScannerPage() {
                         </>
                       )}
                     </Button>
-                    <Button onClick={stopCamera} variant="outline" className="w-full">
+                    <Button
+                      onClick={stopCamera}
+                      variant="outline"
+                      className="w-full"
+                    >
                       Stop Camera
                     </Button>
                   </>
                 )}
 
                 {(scanResult || validationResult || error) && (
-                  <Button onClick={resetScanner} variant="ghost" className="w-full">
+                  <Button
+                    onClick={resetScanner}
+                    variant="ghost"
+                    className="w-full"
+                  >
                     Reset Scanner
                   </Button>
                 )}

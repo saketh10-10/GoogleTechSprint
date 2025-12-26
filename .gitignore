@@ -23,6 +23,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+firebase-debug.log*
+firestore-debug.log*
 
 # local env files
 .env
@@ -35,3 +37,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Error logs and test files
+tsc_errors*.txt
+*-debug.log
+test-*.html
+test-*.js
+*-test.html
+debug-*.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Firebase
+.firebase/

@@ -1,7 +1,14 @@
 // Firebase Configuration and Initialization
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  Firestore, 
+  connectFirestoreEmulator,
+  enableIndexedDbPersistence,
+  initializeFirestore,
+  CACHE_SIZE_UNLIMITED
+} from 'firebase/firestore';
 import { getFunctions, Functions, connectFunctionsEmulator } from 'firebase/functions';
 
 /**
@@ -16,16 +23,80 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:123456789:web:demo"
 };
 
+// Check if we have valid Firebase configuration
+const hasValidConfig = firebaseConfig.projectId !== 'demo-project' || 
+                       process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
+
+if (!hasValidConfig && typeof window !== 'undefined') {
+  console.error('❌ Invalid Firebase configuration detected!');
+  console.error('📋 Please either:');
+  console.error('   1. Set up real Firebase credentials in .env.local');
+  console.error('   2. OR run emulators: firebase emulators:start');
+  console.error('   3. AND set NEXT_PUBLIC_USE_EMULATORS=true in .env.local');
+}
+
 // Initialize Firebase (singleton pattern)
 let app: FirebaseApp;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
+  if (typeof window !== 'undefined') {
+    console.log('🔥 Firebase app initialized:', firebaseConfig.projectId);
+  }
 } else {
   app = getApps()[0];
+  if (typeof window !== 'undefined') {
+    console.log('🔥 Using existing Firebase app');
+  }
 }
 
+// Initialize Firebase services
 const auth: Auth = getAuth(app);
-const db: Firestore = getFirestore(app);
+
+// Initialize Firestore - ensure singleton pattern
+let db: Firestore;
+try {
+  // First, try to get any existing Firestore instance
+  const existingApps = getApps();
+  if (existingApps.length > 0) {
+    try {
+      db = getFirestore(app);
+      if (typeof window !== 'undefined') {
+        console.log('✅ Using existing Firestore instance');
+      }
+    } catch (e) {
+      // If getFirestore fails, initialize new instance
+      db = initializeFirestore(app, {
+        cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+        experimentalForceLongPolling: true,
+      });
+      if (typeof window !== 'undefined') {
+        console.log('✅ Firestore initialized with custom settings');
+      }
+    }
+  } else {
+    // No existing app, initialize fresh
+    db = initializeFirestore(app, {
+      cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+      experimentalForceLongPolling: true,
+    });
+    if (typeof window !== 'undefined') {
+      console.log('✅ Firestore initialized');
+    }
+  }
+} catch (error: any) {
+  // Fallback: try one more time with getFirestore
+  console.warn('⚠️ Firestore initialization attempt failed, trying fallback...', error.message);
+  try {
+    db = getFirestore(app);
+    if (typeof window !== 'undefined') {
+      console.log('✅ Firestore initialized via fallback');
+    }
+  } catch (fallbackError: any) {
+    console.error('❌ Fatal: Could not initialize Firestore:', fallbackError);
+    throw new Error(`Firestore initialization failed: ${fallbackError.message}`);
+  }
+}
+
 const functions: Functions = getFunctions(app, 'us-central1');
 
 // Flag to prevent multiple emulator connections during HMR
@@ -64,4 +135,43 @@ if (process.env.NODE_ENV === 'development') {
   }
 }
 
+// Enable offline persistence for better offline support (only in browser)
+if (typeof window !== 'undefined' && db) {
+  enableIndexedDbPersistence(db)
+    .then(() => {
+      console.log('✅ Firestore offline persistence enabled');
+    })
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.warn('⚠️ Firestore persistence failed: Multiple tabs open');
+      } else if (err.code === 'unimplemented') {
+        console.warn('⚠️ Firestore persistence not available in this browser');
+      } else {
+        console.error('❌ Firestore persistence error:', err);
+      }
+    });
+}
+
 export { app, auth, db, functions };
+
+// Validation function to check if Firestore is properly initialized
+export const isFirestoreInitialized = (): boolean => {
+  try {
+    if (!db) {
+      console.error('❌ Firestore instance is not defined');
+      return false;
+    }
+    return db !== null && db !== undefined && typeof db === 'object';
+  } catch (error) {
+    console.error('❌ Error checking Firestore initialization:', error);
+    return false;
+  }
+};
+
+// Helper function to get db with error checking
+export const getDb = (): Firestore => {
+  if (!db) {
+    throw new Error('Firestore is not initialized. Please check your Firebase configuration.');
+  }
+  return db;
+};

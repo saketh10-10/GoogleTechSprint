@@ -1,15 +1,25 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthGuard from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, Clock, QrCode, Shield, Eye, EyeOff } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock,
+  QrCode,
+  Shield,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-service";
 
-export default function QRDisplayPage() {
+// Force dynamic rendering for this page
+export const dynamic = "force-dynamic";
+
+function QRDisplayContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -24,16 +34,16 @@ export default function QRDisplayPage() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const visibilityRef = useRef<boolean>(true);
 
-  const eventTitle = searchParams.get('eventTitle') || 'Event';
-  const eventVenue = searchParams.get('eventVenue') || 'Venue';
+  const eventTitle = searchParams.get("eventTitle") || "Event";
+  const eventVenue = searchParams.get("eventVenue") || "Venue";
 
   useEffect(() => {
     // Get QR data from URL parameters
-    const payload = searchParams.get('payload');
-    const expiresAt = searchParams.get('expiresAt');
+    const payload = searchParams.get("payload");
+    const expiresAt = searchParams.get("expiresAt");
 
     if (!payload) {
-      router.push('/events');
+      router.push("/events");
       return;
     }
 
@@ -43,7 +53,10 @@ export default function QRDisplayPage() {
     if (expiresAt) {
       const expiryTime = parseInt(expiresAt);
       const currentTime = Date.now();
-      const remaining = Math.max(0, Math.floor((expiryTime - currentTime) / 1000));
+      const remaining = Math.max(
+        0,
+        Math.floor((expiryTime - currentTime) / 1000)
+      );
       setTimeLeft(remaining);
       setIsExpired(remaining <= 0);
     }
@@ -97,37 +110,39 @@ export default function QRDisplayPage() {
     };
 
     // Add event listeners
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
 
     // Cleanup
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
-      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, [searchParams, router]);
 
   const generateQRCode = async (payload: string) => {
     try {
       // Use QR Code API (you can replace with your preferred QR code service)
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(payload)}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+        payload
+      )}`;
       setQrCodeUrl(qrUrl);
     } catch (error) {
-      console.error('Error generating QR code:', error);
+      console.error("Error generating QR code:", error);
     }
   };
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleRefreshQR = () => {
@@ -135,27 +150,38 @@ export default function QRDisplayPage() {
   };
 
   const handleBackToEvents = () => {
-    router.push('/events');
+    router.push("/events");
   };
 
   if (isExpired) {
     return (
-      <AuthGuard allowedRoles={['student', 'faculty']} requireAuth={true} requireRole={true}>
+      <AuthGuard
+        allowedRoles={["student", "faculty"]}
+        requireAuth={true}
+        requireRole={true}
+      >
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
               <AlertTriangle className="w-16 h-16 text-red-600 mx-auto mb-4" />
-              <CardTitle className="text-xl text-red-600">QR Code Expired</CardTitle>
+              <CardTitle className="text-xl text-red-600">
+                QR Code Expired
+              </CardTitle>
             </CardHeader>
             <CardContent className="text-center space-y-4">
               <p className="text-gray-600 dark:text-gray-400">
-                This QR code has expired and is no longer valid for attendance marking.
+                This QR code has expired and is no longer valid for attendance
+                marking.
               </p>
               <div className="space-y-2">
                 <Button onClick={handleRefreshQR} className="w-full">
                   Generate New QR Code
                 </Button>
-                <Button variant="outline" onClick={handleBackToEvents} className="w-full">
+                <Button
+                  variant="outline"
+                  onClick={handleBackToEvents}
+                  className="w-full"
+                >
                   Back to Events
                 </Button>
               </div>
@@ -167,7 +193,11 @@ export default function QRDisplayPage() {
   }
 
   return (
-    <AuthGuard allowedRoles={['student', 'faculty']} requireAuth={true} requireRole={true}>
+    <AuthGuard
+      allowedRoles={["student", "faculty"]}
+      requireAuth={true}
+      requireRole={true}
+    >
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
         <div className="max-w-md mx-auto">
           <Card className="shadow-xl">
@@ -187,8 +217,8 @@ export default function QRDisplayPage() {
               <Alert>
                 <Shield className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Security:</strong> This QR code is unique and single-use.
-                  Do not share or screenshot this code.
+                  <strong>Security:</strong> This QR code is unique and
+                  single-use. Do not share or screenshot this code.
                 </AlertDescription>
               </Alert>
 
@@ -212,10 +242,10 @@ export default function QRDisplayPage() {
                     ref={qrRef}
                     className="inline-block p-4 bg-white rounded-lg shadow-inner"
                     style={{
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none',
-                      MozUserSelect: 'none',
-                      msUserSelect: 'none'
+                      userSelect: "none",
+                      WebkitUserSelect: "none",
+                      MozUserSelect: "none",
+                      msUserSelect: "none",
                     }}
                   >
                     <img
@@ -225,9 +255,9 @@ export default function QRDisplayPage() {
                       draggable={false}
                       onContextMenu={(e) => e.preventDefault()}
                       style={{
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                        WebkitUserSelect: 'none'
+                        pointerEvents: "none",
+                        userSelect: "none",
+                        WebkitUserSelect: "none",
                       }}
                     />
                   </div>
@@ -237,14 +267,20 @@ export default function QRDisplayPage() {
                       {isVisible ? (
                         <>
                           <EyeOff className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                          <p className="text-sm text-gray-500">QR Code Hidden</p>
-                          <p className="text-xs text-gray-400 mt-1">Focus window to show</p>
+                          <p className="text-sm text-gray-500">
+                            QR Code Hidden
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Focus window to show
+                          </p>
                         </>
                       ) : (
                         <>
                           <Shield className="w-12 h-12 text-orange-400 mx-auto mb-2" />
                           <p className="text-sm text-orange-600">Tab Changed</p>
-                          <p className="text-xs text-orange-500 mt-1">QR hidden for security</p>
+                          <p className="text-xs text-orange-500 mt-1">
+                            QR hidden for security
+                          </p>
                         </>
                       )}
                     </div>
@@ -254,7 +290,9 @@ export default function QRDisplayPage() {
 
               {/* Instructions */}
               <div className="text-center space-y-2">
-                <p className="text-sm font-medium">Show this QR code to the scanner</p>
+                <p className="text-sm font-medium">
+                  Show this QR code to the scanner
+                </p>
                 <p className="text-xs text-gray-600 dark:text-gray-400">
                   The scanner will validate and mark your attendance
                 </p>
@@ -289,5 +327,19 @@ export default function QRDisplayPage() {
         </div>
       </div>
     </AuthGuard>
+  );
+}
+
+export default function QRDisplayPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      }
+    >
+      <QRDisplayContent />
+    </Suspense>
   );
 }

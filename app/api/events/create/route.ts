@@ -84,6 +84,10 @@ export async function POST(request: NextRequest) {
       const { collection, addDoc, Timestamp } = await import('firebase/firestore');
       const { db } = await import('@/lib/firebase');
 
+      if (!db || typeof db !== 'object') {
+        throw new Error('Firestore not initialized');
+      }
+
       const docData = {
         ...eventData,
         date: Timestamp.fromDate(new Date(date)),

@@ -4,10 +4,22 @@ import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,9 +33,21 @@ import {
   Trash2,
   RefreshCw,
   Loader2,
+  Home,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-service";
-import { doc, getDoc, collection, addDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
@@ -33,7 +57,7 @@ interface Room {
   roomId: string;
   roomName: string;
   capacity: number;
-  roomType: 'classroom' | 'lab' | 'seminar';
+  roomType: "classroom" | "lab" | "seminar";
   isActive: boolean;
   createdAt: Date;
 }
@@ -43,7 +67,7 @@ interface Section {
   department: string;
   sectionName: string;
   classStrength: number;
-  requiredRoomType?: 'classroom' | 'lab' | 'seminar';
+  requiredRoomType?: "classroom" | "lab" | "seminar";
   createdAt: Date;
 }
 
@@ -83,33 +107,34 @@ const RoomSyncPage = memo(function RoomSyncPage() {
     rooms: false,
     sections: false,
     allocation: false,
-    dashboard: false
+    dashboard: false,
   });
 
   // Form states
   const [newRoom, setNewRoom] = useState({
     roomName: "",
     capacity: "",
-    roomType: "classroom" as 'classroom' | 'lab' | 'seminar'
+    roomType: "classroom" as "classroom" | "lab" | "seminar",
   });
 
   const [newSection, setNewSection] = useState({
     department: "",
     sectionName: "",
     classStrength: "",
-    requiredRoomType: "classroom" as 'classroom' | 'lab' | 'seminar'
+    requiredRoomType: "classroom" as "classroom" | "lab" | "seminar",
   });
 
   const [allocationForm, setAllocationForm] = useState({
     sectionId: "",
     date: "",
     startTime: "",
-    endTime: ""
+    endTime: "",
   });
 
   const [suggestedRooms, setSuggestedRooms] = useState<Room[]>([]);
   const [lastDataRefresh, setLastDataRefresh] = useState<Date | null>(null);
-  const [loadingProgress, setLoadingProgress] = useState<string>('Initializing...');
+  const [loadingProgress, setLoadingProgress] =
+    useState<string>("Initializing...");
 
   // Network status detection
   const [isOnline, setIsOnline] = useState(true);
@@ -118,25 +143,25 @@ const RoomSyncPage = memo(function RoomSyncPage() {
     const handleOnline = () => {
       setIsOnline(true);
       setIsOffline(false);
-      console.log('Connection restored - switching to online mode');
+      console.log("Connection restored - switching to online mode");
     };
 
     const handleOffline = () => {
       setIsOnline(false);
       setIsOffline(true);
-      console.log('Connection lost - switching to offline mode');
+      console.log("Connection lost - switching to offline mode");
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     // Set initial state
     setIsOnline(navigator.onLine);
     setIsOffline(!navigator.onLine);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
@@ -144,15 +169,17 @@ const RoomSyncPage = memo(function RoomSyncPage() {
   useEffect(() => {
     const checkAuth = async () => {
       // 1. Quick check: Try to use cached role for immediate UI response
-      const cachedRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
-      const cachedUser = typeof window !== 'undefined' ? localStorage.getItem('authUser') : null;
+      const cachedRole =
+        typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
+      const cachedUser =
+        typeof window !== "undefined" ? localStorage.getItem("authUser") : null;
 
       if (cachedRole) {
         setUserRole(cachedRole);
         setIsAuthorized(true);
         setIsLoading(false); // Stop showing the main loader early
-        if (cachedRole === 'student') setActiveTab('dashboard');
-        setLoadingProgress('Validating session...');
+        if (cachedRole === "student") setActiveTab("dashboard");
+        setLoadingProgress("Validating session...");
       }
 
       const user = getCurrentUser();
@@ -164,53 +191,63 @@ const RoomSyncPage = memo(function RoomSyncPage() {
         }
       } else {
         setCurrentUser(user);
-        if (typeof window !== 'undefined') localStorage.setItem('authUser', JSON.stringify({ uid: user.uid, email: user.email }));
+        if (typeof window !== "undefined")
+          localStorage.setItem(
+            "authUser",
+            JSON.stringify({ uid: user.uid, email: user.email })
+          );
       }
 
       // 2. Background validation: Verify role from Firestore
       try {
         if (!user) return; // Wait for user if not loaded yet
 
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
           const role = userData.role;
 
-          localStorage.setItem('userRole', role);
+          localStorage.setItem("userRole", role);
           setUserRole(role);
           setIsAuthorized(true);
 
-          if (!cachedRole && role === 'student') {
-            setActiveTab('dashboard');
+          if (!cachedRole && role === "student") {
+            setActiveTab("dashboard");
           }
         } else if (!cachedRole) {
-          router.push('/login');
+          router.push("/login");
           return;
         }
       } catch (error: any) {
-        console.warn('Background role validation failed:', error.message);
+        console.warn("Background role validation failed:", error.message);
         // If we have a cached role, we're already authorized, so we just continue
         if (!cachedRole) {
-          router.push('/login');
+          router.push("/login");
         }
       } finally {
         setIsLoading(false);
-        setLoadingProgress('');
+        setLoadingProgress("");
       }
     };
 
     checkAuth();
   }, [router]);
 
-
   // Memoized computed values for performance optimization
-  const activeRooms = useMemo(() => rooms.filter(room => room.isActive), [rooms]);
+  const activeRooms = useMemo(
+    () => rooms.filter((room) => room.isActive),
+    [rooms]
+  );
 
   const enrichedAllocations = useMemo(() => {
-    return allocations.map(allocation => ({
+    return allocations.map((allocation) => ({
       ...allocation,
-      roomName: rooms.find(r => r.roomId === allocation.roomId)?.roomName || 'Unknown Room',
-      sectionName: sections.find(s => s.sectionId === allocation.sectionId)?.sectionName || 'Unknown Section'
+      roomName:
+        rooms.find((r) => r.roomId === allocation.roomId)?.roomName ||
+        "Unknown Room",
+      sectionName:
+        sections.find((s) => s.sectionId === allocation.sectionId)
+          ?.sectionName || "Unknown Section",
     }));
   }, [allocations, rooms, sections]);
 
@@ -218,46 +255,61 @@ const RoomSyncPage = memo(function RoomSyncPage() {
   useEffect(() => {
     if (!isAuthorized) return;
 
-    console.log('Establishing real-time RoomSync listeners...');
-    const { collection, query, orderBy, onSnapshot, where, limit } = require('firebase/firestore');
+    // Check if db is initialized
+    if (!db || typeof db !== "object") {
+      console.log("⏳ Waiting for Firestore initialization in RoomSync");
+      return;
+    }
+
+    console.log("Establishing real-time RoomSync listeners...");
 
     // 1. Rooms listener
-    const roomsQuery = query(collection(db, 'rooms'), orderBy('roomName', 'asc'));
+    const roomsQuery = query(
+      collection(db, "rooms"),
+      orderBy("roomName", "asc")
+    );
     const unsubscribeRooms = onSnapshot(roomsQuery, (snapshot: any) => {
       const roomsData = snapshot.docs.map((doc: any) => ({
         ...doc.data(),
-        roomId: doc.id
+        roomId: doc.id,
       })) as Room[];
       setRooms(roomsData);
     });
 
     // 2. Sections listener
-    const sectionsQuery = query(collection(db, 'sections'), orderBy('createdAt', 'desc'));
+    const sectionsQuery = query(
+      collection(db, "sections"),
+      orderBy("createdAt", "desc")
+    );
     const unsubscribeSections = onSnapshot(sectionsQuery, (snapshot: any) => {
       const sectionsData = snapshot.docs.map((doc: any) => ({
         ...doc.data(),
-        sectionId: doc.id
+        sectionId: doc.id,
       })) as Section[];
       setSections(sectionsData);
     });
 
     // 3. Allocations listener (filtered by dashboard date)
-    const targetDate = allocationForm.date || new Date().toISOString().split('T')[0];
+    const targetDate =
+      allocationForm.date || new Date().toISOString().split("T")[0];
     const allocationsQuery = query(
-      collection(db, 'allocations'),
-      where('date', '==', targetDate),
-      orderBy('startTime', 'asc'),
+      collection(db, "allocations"),
+      where("date", "==", targetDate),
+      orderBy("startTime", "asc"),
       limit(50)
     );
 
-    const unsubscribeAllocations = onSnapshot(allocationsQuery, (snapshot: any) => {
-      const allocationsData = snapshot.docs.map((doc: any) => ({
-        ...doc.data(),
-        allocationId: doc.id
-      })) as Allocation[];
-      setAllocations(allocationsData);
-      setDataLoading(false);
-    });
+    const unsubscribeAllocations = onSnapshot(
+      allocationsQuery,
+      (snapshot: any) => {
+        const allocationsData = snapshot.docs.map((doc: any) => ({
+          ...doc.data(),
+          allocationId: doc.id,
+        })) as Allocation[];
+        setAllocations(allocationsData);
+        setDataLoading(false);
+      }
+    );
 
     return () => {
       unsubscribeRooms();
@@ -274,18 +326,18 @@ const RoomSyncPage = memo(function RoomSyncPage() {
   // Load cached data for offline scenarios
   const loadCachedData = () => {
     try {
-      const cachedRooms = localStorage.getItem('cachedRooms');
-      const cachedSections = localStorage.getItem('cachedSections');
-      const cachedAllocations = localStorage.getItem('cachedAllocations');
+      const cachedRooms = localStorage.getItem("cachedRooms");
+      const cachedSections = localStorage.getItem("cachedSections");
+      const cachedAllocations = localStorage.getItem("cachedAllocations");
 
       if (cachedRooms) {
         setRooms(JSON.parse(cachedRooms));
-        console.log('Loaded rooms from cache');
+        console.log("Loaded rooms from cache");
       }
 
       if (cachedSections) {
         setSections(JSON.parse(cachedSections));
-        console.log('Loaded sections from cache');
+        console.log("Loaded sections from cache");
       }
 
       if (cachedAllocations) {
@@ -293,14 +345,18 @@ const RoomSyncPage = memo(function RoomSyncPage() {
         // Enrich cached allocations with room/section names
         const enrichedAllocations = allocationsData.map((allocation: any) => ({
           ...allocation,
-          roomName: rooms.find(r => r.roomId === allocation.roomId)?.roomName || 'Unknown Room',
-          sectionName: sections.find(s => s.sectionId === allocation.sectionId)?.sectionName || 'Unknown Section'
+          roomName:
+            rooms.find((r) => r.roomId === allocation.roomId)?.roomName ||
+            "Unknown Room",
+          sectionName:
+            sections.find((s) => s.sectionId === allocation.sectionId)
+              ?.sectionName || "Unknown Section",
         }));
         setAllocations(enrichedAllocations);
-        console.log('Loaded allocations from cache');
+        console.log("Loaded allocations from cache");
       }
     } catch (error) {
-      console.error('Error loading cached data:', error);
+      console.error("Error loading cached data:", error);
     }
   };
 
@@ -312,23 +368,23 @@ const RoomSyncPage = memo(function RoomSyncPage() {
     setLoading(true);
 
     try {
-      const createRoomFunction = httpsCallable(functions, 'createRoom');
+      const createRoomFunction = httpsCallable(functions, "createRoom");
       const result = (await createRoomFunction({
         roomName: newRoom.roomName,
         capacity: parseInt(newRoom.capacity),
-        roomType: newRoom.roomType
+        roomType: newRoom.roomType,
       })) as any;
 
       if (result.data.success) {
         setNewRoom({ roomName: "", capacity: "", roomType: "classroom" });
         // Real-time listener handles the update
-        alert('Room created successfully!');
+        alert("Room created successfully!");
       } else {
-        alert(result.data.error || 'Failed to create room');
+        alert(result.data.error || "Failed to create room");
       }
     } catch (error) {
-      console.error('Error creating room:', error);
-      alert('Failed to create room');
+      console.error("Error creating room:", error);
+      alert("Failed to create room");
     }
 
     setLoading(false);
@@ -339,24 +395,29 @@ const RoomSyncPage = memo(function RoomSyncPage() {
     setLoading(true);
 
     try {
-      const createSectionFunction = httpsCallable(functions, 'createSection');
+      const createSectionFunction = httpsCallable(functions, "createSection");
       const result = (await createSectionFunction({
         department: newSection.department,
         sectionName: newSection.sectionName,
         classStrength: parseInt(newSection.classStrength),
-        requiredRoomType: newSection.requiredRoomType
+        requiredRoomType: newSection.requiredRoomType,
       })) as any;
 
       if (result.data.success) {
-        setNewSection({ department: "", sectionName: "", classStrength: "", requiredRoomType: "classroom" });
+        setNewSection({
+          department: "",
+          sectionName: "",
+          classStrength: "",
+          requiredRoomType: "classroom",
+        });
         // Real-time listener handles the update
-        alert('Section created successfully!');
+        alert("Section created successfully!");
       } else {
-        alert(result.data.error || 'Failed to create section');
+        alert(result.data.error || "Failed to create section");
       }
     } catch (error) {
-      console.error('Error creating section:', error);
-      alert('Failed to create section');
+      console.error("Error creating section:", error);
+      alert("Failed to create section");
     }
 
     setLoading(false);
@@ -364,66 +425,77 @@ const RoomSyncPage = memo(function RoomSyncPage() {
 
   const handleGetSuggestions = async () => {
     if (!allocationForm.sectionId) {
-      alert('Please select a section first');
+      alert("Please select a section first");
       return;
     }
 
-    const section = sections.find(s => s.sectionId === allocationForm.sectionId);
+    const section = sections.find(
+      (s) => s.sectionId === allocationForm.sectionId
+    );
     if (!section) return;
 
     try {
-      const suggestRoomsFunction = httpsCallable(functions, 'suggestRooms');
+      const suggestRoomsFunction = httpsCallable(functions, "suggestRooms");
       const result = (await suggestRoomsFunction({
         sectionStrength: section.classStrength,
         duration: 60, // Default 1 hour
-        roomType: section.requiredRoomType || 'classroom'
+        roomType: section.requiredRoomType || "classroom",
       })) as any;
 
       if (result.data.success) {
         setSuggestedRooms(result.data.rooms || []);
       } else {
-        alert(result.data.error || 'Failed to get suggestions');
+        alert(result.data.error || "Failed to get suggestions");
       }
     } catch (error) {
-      console.error('Error getting suggestions:', error);
-      alert('Failed to get room suggestions');
+      console.error("Error getting suggestions:", error);
+      alert("Failed to get room suggestions");
     }
   };
 
   const handleAllocateRoom = async (roomId: string) => {
-    if (!allocationForm.sectionId || !allocationForm.date || !allocationForm.startTime || !allocationForm.endTime) {
-      alert('Please fill all allocation details');
+    if (
+      !allocationForm.sectionId ||
+      !allocationForm.date ||
+      !allocationForm.startTime ||
+      !allocationForm.endTime
+    ) {
+      alert("Please fill all allocation details");
       return;
     }
 
     setLoading(true);
 
     try {
-      const allocateRoomFunction = httpsCallable(functions, 'allocateRoom');
+      const allocateRoomFunction = httpsCallable(functions, "allocateRoom");
       const result = (await allocateRoomFunction({
         roomId,
         sectionId: allocationForm.sectionId,
         date: allocationForm.date,
         startTime: allocationForm.startTime,
-        endTime: allocationForm.endTime
+        endTime: allocationForm.endTime,
       })) as any;
 
       if (result.data.success) {
-        setAllocationForm({ sectionId: "", date: "", startTime: "", endTime: "" });
+        setAllocationForm({
+          sectionId: "",
+          date: "",
+          startTime: "",
+          endTime: "",
+        });
         setSuggestedRooms([]);
         // Real-time listener handles the update
-        alert('Room allocated successfully!');
+        alert("Room allocated successfully!");
       } else {
-        alert(result.data.error || 'Failed to allocate room');
+        alert(result.data.error || "Failed to allocate room");
       }
     } catch (error) {
-      console.error('Error allocating room:', error);
-      alert('Failed to allocate room');
+      console.error("Error allocating room:", error);
+      alert("Failed to allocate room");
     }
 
     setLoading(false);
   };
-
 
   if (isLoading) {
     return (
@@ -452,17 +524,17 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                 href="/"
                 className="text-xl font-medium text-foreground tracking-tight"
               >
-                AttendAI
+                EduSync
               </Link>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground capitalize">
-                {userRole || 'User'} Portal
+                {userRole || "User"} Portal
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push('/login')}
+                onClick={() => router.push("/login")}
                 className="hover:bg-secondary"
               >
                 Sign Out
@@ -477,7 +549,9 @@ const RoomSyncPage = memo(function RoomSyncPage() {
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-4">
                 <Building2 className="w-6 h-6 text-primary" />
-                <h1 className="text-3xl font-medium text-foreground">RoomSync</h1>
+                <h1 className="text-3xl font-medium text-foreground">
+                  RoomSync
+                </h1>
               </div>
               <p className="text-muted-foreground">
                 AI-Powered Room Management & Allocation System
@@ -490,7 +564,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-6"></div>
                 <h3 className="text-lg font-medium mb-2">Loading RoomSync</h3>
                 <p className="text-muted-foreground mb-2">
-                  {loadingProgress || 'Initializing...'}
+                  {loadingProgress || "Initializing..."}
                 </p>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
@@ -514,7 +588,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
               href="/"
               className="text-xl font-medium text-foreground tracking-tight"
             >
-              AttendAI
+              EduSync
             </Link>
             <div className="hidden md:flex items-center gap-6">
               <Link
@@ -526,13 +600,22 @@ const RoomSyncPage = memo(function RoomSyncPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/")}
+              className="hover:bg-secondary"
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Home
+            </Button>
             <span className="text-sm text-muted-foreground capitalize">
-              {userRole || 'User'} Portal
+              {userRole || "User"} Portal
             </span>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push('/login')}
+              onClick={() => router.push("/login")}
               className="hover:bg-secondary"
             >
               Sign Out
@@ -548,7 +631,9 @@ const RoomSyncPage = memo(function RoomSyncPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Building2 className="w-6 h-6 text-primary" />
-                <h1 className="text-3xl font-medium text-foreground">RoomSync</h1>
+                <h1 className="text-3xl font-medium text-foreground">
+                  RoomSync
+                </h1>
               </div>
               <div className="flex items-center gap-3">
                 {lastDataRefresh && (
@@ -559,7 +644,7 @@ const RoomSyncPage = memo(function RoomSyncPage() {
               </div>
             </div>
             <p className="text-muted-foreground">
-              {userRole === 'student'
+              {userRole === "student"
                 ? "View your room allocations and schedules"
                 : "AI-Powered Room Management & Allocation System"}
             </p>
@@ -574,16 +659,25 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                     You're Offline
                   </p>
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    Using cached data. Some features may be limited until connection is restored.
+                    Using cached data. Some features may be limited until
+                    connection is restored.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-            <TabsList className={`grid w-full ${userRole === 'student' ? 'grid-cols-1' : 'grid-cols-4'}`}>
-              {(userRole === 'faculty' || userRole === 'admin') && (
+          <Tabs
+            value={activeTab}
+            onValueChange={handleTabChange}
+            className="space-y-6"
+          >
+            <TabsList
+              className={`grid w-full ${
+                userRole === "student" ? "grid-cols-1" : "grid-cols-4"
+              }`}
+            >
+              {(userRole === "faculty" || userRole === "admin") && (
                 <>
                   <TabsTrigger value="rooms">Room Management</TabsTrigger>
                   <TabsTrigger value="sections">Section Management</TabsTrigger>
@@ -591,7 +685,9 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                 </>
               )}
               <TabsTrigger value="dashboard">
-                {userRole === 'student' ? 'Current Allocations' : 'Allocation Dashboard'}
+                {userRole === "student"
+                  ? "Current Allocations"
+                  : "Allocation Dashboard"}
               </TabsTrigger>
             </TabsList>
 
@@ -617,7 +713,9 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="roomName"
                           placeholder="e.g., Room 101"
                           value={newRoom.roomName}
-                          onChange={(e) => setNewRoom({ ...newRoom, roomName: e.target.value })}
+                          onChange={(e) =>
+                            setNewRoom({ ...newRoom, roomName: e.target.value })
+                          }
                           required
                         />
                       </div>
@@ -629,7 +727,9 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           type="number"
                           placeholder="e.g., 50"
                           value={newRoom.capacity}
-                          onChange={(e) => setNewRoom({ ...newRoom, capacity: e.target.value })}
+                          onChange={(e) =>
+                            setNewRoom({ ...newRoom, capacity: e.target.value })
+                          }
                           required
                           min="1"
                         />
@@ -637,19 +737,30 @@ const RoomSyncPage = memo(function RoomSyncPage() {
 
                       <div className="space-y-2">
                         <Label htmlFor="roomType">Room Type</Label>
-                        <Select value={newRoom.roomType} onValueChange={(value: any) => setNewRoom({ ...newRoom, roomType: value })}>
+                        <Select
+                          value={newRoom.roomType}
+                          onValueChange={(value: any) =>
+                            setNewRoom({ ...newRoom, roomType: value })
+                          }
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select room type" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="classroom">Classroom</SelectItem>
                             <SelectItem value="lab">Lab</SelectItem>
-                            <SelectItem value="seminar">Seminar Hall</SelectItem>
+                            <SelectItem value="seminar">
+                              Seminar Hall
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
-                      <Button type="submit" className="w-full" disabled={loading}>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={loading}
+                      >
                         {loading ? "Creating..." : "Create Room"}
                       </Button>
                     </form>
@@ -667,17 +778,25 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                   <CardContent>
                     <div className="space-y-3">
                       {activeRooms.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-4">No rooms registered yet</p>
+                        <p className="text-muted-foreground text-center py-4">
+                          No rooms registered yet
+                        </p>
                       ) : (
                         activeRooms.map((room) => (
-                          <div key={room.roomId} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div
+                            key={room.roomId}
+                            className="flex items-center justify-between p-3 border rounded-lg"
+                          >
                             <div>
                               <p className="font-medium">{room.roomName}</p>
                               <p className="text-sm text-muted-foreground">
-                                Capacity: {room.capacity} • Type: {room.roomType}
+                                Capacity: {room.capacity} • Type:{" "}
+                                {room.roomType}
                               </p>
                             </div>
-                            <Badge variant={room.isActive ? "default" : "secondary"}>
+                            <Badge
+                              variant={room.isActive ? "default" : "secondary"}
+                            >
                               {room.isActive ? "Active" : "Inactive"}
                             </Badge>
                           </div>
@@ -711,7 +830,12 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="department"
                           placeholder="e.g., Computer Science"
                           value={newSection.department}
-                          onChange={(e) => setNewSection({ ...newSection, department: e.target.value })}
+                          onChange={(e) =>
+                            setNewSection({
+                              ...newSection,
+                              department: e.target.value,
+                            })
+                          }
                           required
                         />
                       </div>
@@ -722,7 +846,12 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="sectionName"
                           placeholder="e.g., CS-A"
                           value={newSection.sectionName}
-                          onChange={(e) => setNewSection({ ...newSection, sectionName: e.target.value })}
+                          onChange={(e) =>
+                            setNewSection({
+                              ...newSection,
+                              sectionName: e.target.value,
+                            })
+                          }
                           required
                         />
                       </div>
@@ -734,27 +863,48 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           type="number"
                           placeholder="e.g., 45"
                           value={newSection.classStrength}
-                          onChange={(e) => setNewSection({ ...newSection, classStrength: e.target.value })}
+                          onChange={(e) =>
+                            setNewSection({
+                              ...newSection,
+                              classStrength: e.target.value,
+                            })
+                          }
                           required
                           min="1"
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="requiredRoomType">Required Room Type</Label>
-                        <Select value={newSection.requiredRoomType} onValueChange={(value: any) => setNewSection({ ...newSection, requiredRoomType: value })}>
+                        <Label htmlFor="requiredRoomType">
+                          Required Room Type
+                        </Label>
+                        <Select
+                          value={newSection.requiredRoomType}
+                          onValueChange={(value: any) =>
+                            setNewSection({
+                              ...newSection,
+                              requiredRoomType: value,
+                            })
+                          }
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select room type" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="classroom">Classroom</SelectItem>
                             <SelectItem value="lab">Lab</SelectItem>
-                            <SelectItem value="seminar">Seminar Hall</SelectItem>
+                            <SelectItem value="seminar">
+                              Seminar Hall
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
-                      <Button type="submit" className="w-full" disabled={loading}>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={loading}
+                      >
                         {loading ? "Creating..." : "Create Section"}
                       </Button>
                     </form>
@@ -772,14 +922,22 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                   <CardContent>
                     <div className="space-y-3">
                       {sections.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-4">No sections registered yet</p>
+                        <p className="text-muted-foreground text-center py-4">
+                          No sections registered yet
+                        </p>
                       ) : (
                         sections.map((section) => (
-                          <div key={section.sectionId} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div
+                            key={section.sectionId}
+                            className="flex items-center justify-between p-3 border rounded-lg"
+                          >
                             <div>
-                              <p className="font-medium">{section.sectionName}</p>
+                              <p className="font-medium">
+                                {section.sectionName}
+                              </p>
                               <p className="text-sm text-muted-foreground">
-                                {section.department} • Strength: {section.classStrength}
+                                {section.department} • Strength:{" "}
+                                {section.classStrength}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 Requires: {section.requiredRoomType}
@@ -811,14 +969,26 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="section">Select Section</Label>
-                      <Select value={allocationForm.sectionId} onValueChange={(value) => setAllocationForm({ ...allocationForm, sectionId: value })}>
+                      <Select
+                        value={allocationForm.sectionId}
+                        onValueChange={(value) =>
+                          setAllocationForm({
+                            ...allocationForm,
+                            sectionId: value,
+                          })
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Choose a section" />
                         </SelectTrigger>
                         <SelectContent>
                           {sections.map((section) => (
-                            <SelectItem key={section.sectionId} value={section.sectionId}>
-                              {section.sectionName} ({section.classStrength} students)
+                            <SelectItem
+                              key={section.sectionId}
+                              value={section.sectionId}
+                            >
+                              {section.sectionName} ({section.classStrength}{" "}
+                              students)
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -831,7 +1001,12 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                         id="date"
                         type="date"
                         value={allocationForm.date}
-                        onChange={(e) => setAllocationForm({ ...allocationForm, date: e.target.value })}
+                        onChange={(e) =>
+                          setAllocationForm({
+                            ...allocationForm,
+                            date: e.target.value,
+                          })
+                        }
                         required
                       />
                     </div>
@@ -843,7 +1018,12 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="startTime"
                           type="time"
                           value={allocationForm.startTime}
-                          onChange={(e) => setAllocationForm({ ...allocationForm, startTime: e.target.value })}
+                          onChange={(e) =>
+                            setAllocationForm({
+                              ...allocationForm,
+                              startTime: e.target.value,
+                            })
+                          }
                           required
                         />
                       </div>
@@ -853,7 +1033,12 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                           id="endTime"
                           type="time"
                           value={allocationForm.endTime}
-                          onChange={(e) => setAllocationForm({ ...allocationForm, endTime: e.target.value })}
+                          onChange={(e) =>
+                            setAllocationForm({
+                              ...allocationForm,
+                              endTime: e.target.value,
+                            })
+                          }
                           required
                         />
                       </div>
@@ -890,11 +1075,15 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                         </p>
                       ) : (
                         suggestedRooms.map((room) => (
-                          <div key={room.roomId} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div
+                            key={room.roomId}
+                            className="flex items-center justify-between p-3 border rounded-lg"
+                          >
                             <div>
                               <p className="font-medium">{room.roomName}</p>
                               <p className="text-sm text-muted-foreground">
-                                Capacity: {room.capacity} • Type: {room.roomType}
+                                Capacity: {room.capacity} • Type:{" "}
+                                {room.roomType}
                               </p>
                             </div>
                             <Button
@@ -927,13 +1116,18 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">View Day:</span>
+                    <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                      View Day:
+                    </span>
                     <Input
                       type="date"
                       value={allocationForm.date}
                       onChange={(e) => {
                         const newDate = e.target.value;
-                        setAllocationForm(prev => ({ ...prev, date: newDate }));
+                        setAllocationForm((prev) => ({
+                          ...prev,
+                          date: newDate,
+                        }));
                       }}
                       className="max-w-[150px] bg-secondary/30"
                     />
@@ -942,34 +1136,57 @@ const RoomSyncPage = memo(function RoomSyncPage() {
                 <CardContent>
                   <div className="space-y-4">
                     {enrichedAllocations.length === 0 ? (
-                      <p className="text-muted-foreground text-center py-8">No allocations found</p>
+                      <p className="text-muted-foreground text-center py-8">
+                        No allocations found
+                      </p>
                     ) : (
                       enrichedAllocations.map((allocation) => (
-                        <div key={allocation.allocationId} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div
+                          key={allocation.allocationId}
+                          className="flex items-center justify-between p-4 border rounded-lg"
+                        >
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1">
                             <div>
-                              <p className="text-sm text-muted-foreground">Room</p>
-                              <p className="font-medium">{allocation.roomName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Room
+                              </p>
+                              <p className="font-medium">
+                                {allocation.roomName}
+                              </p>
                             </div>
                             <div>
-                              <p className="text-sm text-muted-foreground">Section</p>
-                              <p className="font-medium">{allocation.sectionName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Section
+                              </p>
+                              <p className="font-medium">
+                                {allocation.sectionName}
+                              </p>
                             </div>
                             <div>
-                              <p className="text-sm text-muted-foreground">Date</p>
+                              <p className="text-sm text-muted-foreground">
+                                Date
+                              </p>
                               <p className="font-medium">{allocation.date}</p>
                             </div>
                             <div>
-                              <p className="text-sm text-muted-foreground">Time</p>
-                              <p className="font-medium">{allocation.startTime} - {allocation.endTime}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Time
+                              </p>
+                              <p className="font-medium">
+                                {allocation.startTime} - {allocation.endTime}
+                              </p>
                             </div>
                           </div>
-                          {(userRole === 'faculty' || userRole === 'admin') && (
+                          {(userRole === "faculty" || userRole === "admin") && (
                             <div className="flex gap-2">
                               <Button variant="outline" size="sm">
                                 <Edit className="w-4 h-4" />
                               </Button>
-                              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700"
+                              >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
@@ -988,6 +1205,6 @@ const RoomSyncPage = memo(function RoomSyncPage() {
   );
 });
 
-RoomSyncPage.displayName = 'RoomSyncPage';
+RoomSyncPage.displayName = "RoomSyncPage";
 
 export default RoomSyncPage;

@@ -1,8 +1,0 @@
-.next/types/validator.ts(42,39): error TS2307: Cannot find module '../../app/attendai/page.js' or its corresponding type declarations.
-app/issuehub/page.tsx(358,28): error TS2322: Type '{ entries: LeaderboardEntry[]; loading: boolean; }' is not assignable to type 'IntrinsicAttributes'.
-  Property 'entries' does not exist on type 'IntrinsicAttributes'.
-app/issuehub/page.tsx(390,11): error TS2322: Type '{ open: boolean; onOpenChange: Dispatch<SetStateAction<boolean>>; onSubmit: (questionData: { title: string; description: string; tags: string[]; }) => Promise<{ success: boolean; similarQuestions?: any[] | undefined; message?: string | undefined; }>; }' is not assignable to type 'IntrinsicAttributes & PostQuestionDialogProps'.
-  Property 'onSubmit' does not exist on type 'IntrinsicAttributes & PostQuestionDialogProps'.
-app/profile/[userId]/page.tsx(25,10): error TS2614: Module '"@/components/auth-guard"' has no exported member 'AuthGuard'. Did you mean to use 'import AuthGuard from "@/components/auth-guard"' instead?
-components/issuehub/leaderboard.tsx(18,43): error TS2554: Expected 0 arguments, but got 1.
-components/ui/select.tsx(38,73): error TS2339: Property 'onValueChange' does not exist on type 'SelectTriggerProps'.
